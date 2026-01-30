@@ -4,23 +4,20 @@ namespace App\Http\Requests\V1\Catalogo;
 
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
-use Illuminate\Support\Str;
+use App\Http\Requests\V1\Catalogo\Concerns\NormalizesCatalogoInput;
 
 class StoreCatalogoRequest extends FormRequest
 {
-    public function authorize(): bool
-    {
-        return true;
-    }
+    use NormalizesCatalogoInput;
+
+    public function authorize(): bool { return true; }
 
     protected function prepareForValidation(): void
     {
-        $trim = fn($s) => preg_replace('/\s+/u', ' ', trim((string)$s));
-
         $this->merge([
-            'facultad'           => $trim($this->input('facultad')),
-            'programa_academico' => $trim($this->input('programa_academico')),
-            'nivel_academico'    => Str::lower((string)$this->input('nivel_academico')),
+            'facultad'           => $this->normText($this->input('facultad')),
+            'programa_academico' => $this->normText($this->input('programa_academico')),
+            'nivel_academico'    => $this->normNivel($this->input('nivel_academico')),
         ]);
     }
 
@@ -31,8 +28,9 @@ class StoreCatalogoRequest extends FormRequest
             'facultad'           => ['required','string','max:255'],
             'programa_academico' => [
                 'required','string','max:255',
+                // UX: evita duplicados por (facultad + programa)
                 Rule::unique('catalogos', 'programa_academico')
-                    ->where(fn($q) => $q->where('facultad', $this->facultad))
+                    ->where(fn($q) => $q->where('facultad', $this->input('facultad'))),
             ],
         ];
     }

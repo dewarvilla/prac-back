@@ -4,27 +4,29 @@ namespace App\Http\Requests\V1\Catalogo;
 
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
+use App\Http\Requests\V1\Catalogo\Concerns\NormalizesCatalogoInput;
 
 class BulkCatalogoRequest extends FormRequest
 {
-    public function authorize(): bool
-    {
-        return true;
-    }
+    use NormalizesCatalogoInput;
+
+    public function authorize(): bool { return true; }
 
     protected function prepareForValidation(): void
     {
         if (!$this->has('items')) return;
 
-        $trim = fn($s) => preg_replace('/\s+/u', ' ', trim((string)$s));
+        $items = $this->input('items', []);
+        if (!is_array($items)) $items = [];
 
-        $items = collect($this->input('items', []))->map(function ($i) use ($trim) {
-            if (is_array($i)) {
-                if (isset($i['facultad']))           $i['facultad'] = $trim($i['facultad']);
-                if (isset($i['programa_academico'])) $i['programa_academico'] = $trim($i['programa_academico']);
-                if (isset($i['nivel_academico']))    $i['nivel_academico'] = mb_strtolower((string)$i['nivel_academico']);
-            }
-            return $i;
+        $items = collect($items)->map(function ($i) {
+            if (!is_array($i)) return $i;
+
+            return [
+                'nivel_academico'    => $this->normNivel($i['nivel_academico'] ?? null),
+                'facultad'           => $this->normText($i['facultad'] ?? null),
+                'programa_academico' => $this->normText($i['programa_academico'] ?? null),
+            ];
         })->all();
 
         $this->merge(['items' => $items]);
@@ -41,34 +43,30 @@ class BulkCatalogoRequest extends FormRequest
         ];
     }
 
-    public function messages(): array
-    {
-        return [
-            'items.required' => 'Debes enviar al menos un elemento.',
-        ];
-    }
-
-    public function withValidator($validator)
+    public function withValidator($validator): void
     {
         $validator->after(function ($v) {
-            $items = collect($this->input('items', []));
+            $items = $this->input('items', []);
+            if (!is_array($items) || empty($items)) return;
 
-            $norm = function (?string $s): string {
-                $s = (string) $s;
-                $s = preg_replace('/\s+/u', ' ', trim($s));
-                return mb_strtolower($s);
-            };
+            $keys = [];
+            $dupes = [];
 
-            $dupes = $items->groupBy(function ($i) use ($norm) {
-                $fac = $norm($i['facultad'] ?? '');
-                $pro = $norm($i['programa_academico'] ?? '');
-                return $fac.'|'.$pro;
-            })->filter(fn($g) => $g->count() > 1)->keys();
+            foreach ($items as $idx => $it) {
+                $k = $this->normKey($it['facultad'] ?? null, $it['programa_academico'] ?? null);
+                if ($k === '|') continue;
 
-            if ($dupes->isNotEmpty()) {
+                if (isset($keys[$k])) {
+                    $dupes[] = [$keys[$k], $idx]; 
+                } else {
+                    $keys[$k] = $idx;
+                }
+            }
+
+            if (!empty($dupes)) {
                 $v->errors()->add(
                     'items',
-                    'Hay combinaciones repetidas (facultad, programa_académico) en el payload.'
+                    'Hay combinaciones repetidas (facultad, programa_academico) dentro del payload.'
                 );
             }
         });
