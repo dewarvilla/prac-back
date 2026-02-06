@@ -101,8 +101,6 @@ class CreacionService
 
     public function destroyBulk(array $ids): array
     {
-        // ⚠️ tu request convierte ids a int, pero tu ID es UUID (string)
-        // Si tu tabla ya es UUID, cambia BulkDeleteCreacionRequest para NO castear a int.
         $ids = array_values(array_unique(array_map('strval', $ids)));
 
         return DB::transaction(function () use ($ids) {

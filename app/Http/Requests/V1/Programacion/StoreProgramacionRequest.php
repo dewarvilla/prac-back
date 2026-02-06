@@ -13,7 +13,7 @@ class StoreProgramacionRequest extends FormRequest
         return [
             'creacion_id'          => ['required','uuid','exists:creaciones,id'],
 
-            'nombre_practica'      => ['nullable','string','max:255'], // lo sobreescribimos desde Creación
+            'nombre_practica'      => ['nullable','string','max:255'], 
             'descripcion'          => ['required','string'],
             'lugar_de_realizacion' => ['nullable','string','max:255'],
             'justificacion'        => ['required','string'],

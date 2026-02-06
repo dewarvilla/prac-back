@@ -15,17 +15,13 @@ return new class extends Migration {
             $table->uuid('aprobable_id');
             $table->index(['aprobable_type', 'aprobable_id'], 'aprobaciones_aprobable_idx');
 
-            // Etapa canónica (string para permitir crecer sin migraciones)
             $table->string('etapa', 80);
 
-            // Estado de esta decisión
             $table->enum('estado', ['pendiente', 'aprobada', 'rechazada'])->default('pendiente');
 
-            // Quién decide (users.id bigint)
             $table->unsignedBigInteger('decidido_por')->nullable();
             $table->timestamp('decidido_en')->nullable();
 
-            // Justificación/comentario (requerido en rechazo por regla de negocio)
             $table->text('justificacion')->nullable();
 
             // Auditoría
@@ -34,7 +30,6 @@ return new class extends Migration {
 
             $table->timestamps();
 
-            // FK opcional (recomendado)
             $table->foreign('decidido_por')
                 ->references('id')->on('users')
                 ->nullOnDelete();

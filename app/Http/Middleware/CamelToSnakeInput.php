@@ -34,12 +34,12 @@ class CamelToSnakeInput
     public function handle(Request $request, Closure $next)
     {
         try {
-            // 1) Querystring (?programaAcademico.lk=... etc.)
+            // Querystring (?programaAcademico.lk=... etc.)
             if (!empty($request->query())) {
                 $request->query->replace($this->snakeKeys($request->query()));
             }
 
-            // 2) Body JSON o form-data
+            // Body JSON o form-data
             $contentType = (string) $request->headers->get('content-type', '');
 
             if (Str::contains($contentType, 'application/json')) {
@@ -63,7 +63,6 @@ class CamelToSnakeInput
                     }
                 }
             } else {
-                // x-www-form-urlencoded / multipart (request->all incluye files, pero snakeKeys no los toca)
                 $all = $request->all();
                 if (!empty($all)) {
                     $snake = $this->snakeKeys($all);
@@ -71,7 +70,6 @@ class CamelToSnakeInput
                 }
             }
         } catch (\Throwable $e) {
-            // No romper la request por el middleware
             logger()->error('CamelToSnakeInput middleware failed', [
                 'path'    => $request->path(),
                 'message' => $e->getMessage(),
