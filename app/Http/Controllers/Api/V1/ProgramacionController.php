@@ -7,14 +7,15 @@ use App\Http\Requests\V1\Programacion\IndexProgramacionRequest;
 use App\Http\Requests\V1\Programacion\StoreProgramacionRequest;
 use App\Http\Requests\V1\Programacion\UpdateProgramacionRequest;
 use App\Http\Requests\V1\Programacion\BulkDeleteProgramacionRequest;
-use App\Http\Resources\V1\Programacion\ProgramacionCollection;
 use App\Http\Resources\V1\Programacion\ProgramacionResource;
+use App\Http\Resources\V1\Programacion\ProgramacionCollection;
 use App\Models\Programacion;
 use App\Services\ProgramacionService;
+use Illuminate\Support\Facades\DB;
 
 class ProgramacionController extends Controller
 {
-    public function __construct(private ProgramacionService $service)
+    public function __construct(private readonly ProgramacionService $service)
     {
         $this->middleware('permission:programaciones.view')->only(['index','show']);
         $this->middleware('permission:programaciones.create')->only(['store']);
@@ -25,11 +26,13 @@ class ProgramacionController extends Controller
     public function index(IndexProgramacionRequest $request)
     {
         $perPage = (int) $request->query('per_page', 0);
+        $filters = $request->validated();
 
         $result = $this->service->search(
-            $request->validated(),
+            $request->user(),
+            $filters,
             $perPage,
-            $request->user()
+            $request->query()
         );
 
         return $perPage > 0
@@ -63,13 +66,12 @@ class ProgramacionController extends Controller
         $this->authorize('update', $programacion);
 
         $updated = $this->service->update(
-            $programacion->id,
+            $programacion,
             $request->validated(),
             $request->user(),
             $request->ip()
         );
 
-        abort_if(!$updated, 404);
         return new ProgramacionResource($updated);
     }
 
@@ -85,15 +87,22 @@ class ProgramacionController extends Controller
 
     public function destroyBulk(BulkDeleteProgramacionRequest $request)
     {
-        $counts = $this->service->destroyBulk(
-            $request->validated()['ids'],
-            $request->user()
-        );
+        $ids = $request->validated()['ids'];
 
-        return response()->json([
-            'ok'      => true,
-            'message' => 'Programaciones eliminadas correctamente.',
-            'counts'  => $counts,
-        ], 200);
+        return DB::transaction(function () use ($ids, $request) {
+            $programaciones = Programacion::whereIn('id', $ids)->get();
+
+            foreach ($programaciones as $p) {
+                $this->authorize('delete', $p);
+            }
+
+            $counts = $this->service->destroyBulk($programaciones->pluck('id')->map(fn($x)=>(string)$x)->all());
+
+            return response()->json([
+                'ok'      => true,
+                'message' => 'Programaciones eliminadas correctamente.',
+                'counts'  => $counts,
+            ], 200);
+        });
     }
 }

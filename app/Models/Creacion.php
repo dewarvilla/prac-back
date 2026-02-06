@@ -20,22 +20,17 @@ class Creacion extends Model
 
     protected $fillable = [
         'catalogo_id',
-        'nivel_academico',
-        'facultad',
-        'programa_academico',
         'nombre_practica',
         'recursos_necesarios',
         'justificacion',
-        'estado_practica',
-        'estado_depart',
-        'estado_consejo_facultad',
-        'estado_consejo_academico',
+        'estado_creacion',
+        'estado_flujo',
         'usuariocreacion',
         'usuariomodificacion',
         'ipcreacion',
         'ipmodificacion',
     ];
-
+    
     protected $casts = [
         'fechacreacion'     => 'datetime',
         'fechamodificacion' => 'datetime',

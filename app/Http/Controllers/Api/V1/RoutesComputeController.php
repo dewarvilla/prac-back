@@ -4,7 +4,7 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\V1\ComputeRouteRequest;
-use App\Services\RoutesComputeService;
+use App\Services\Ruta\RoutesComputeService;
 
 class RoutesComputeController extends Controller
 {

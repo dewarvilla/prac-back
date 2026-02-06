@@ -7,8 +7,8 @@ use App\Http\Requests\V1\Fecha\IndexFechaRequest;
 use App\Http\Requests\V1\Fecha\StoreFechaRequest;
 use App\Http\Requests\V1\Fecha\UpdateFechaRequest;
 use App\Http\Requests\V1\Fecha\BulkDeleteFechaRequest;
-use App\Http\Resources\V1\Fecha\FechaCollection;
 use App\Http\Resources\V1\Fecha\FechaResource;
+use App\Http\Resources\V1\Fecha\FechaCollection;
 use App\Models\Fecha;
 use App\Services\FechaService;
 
@@ -24,10 +24,10 @@ class FechaController extends Controller
 
     public function index(IndexFechaRequest $request)
     {
-        $perPage  = (int) $request->query('per_page', 0);
-        $filters  = $request->validated();
+        $perPage = (int) $request->query('per_page', 0);
+        $filters = $request->validated();
 
-        $result = $this->service->search($filters, $perPage);
+        $result = $this->service->search($filters, $perPage, $request->query());
 
         return $perPage > 0
             ? new FechaCollection($result)
@@ -80,7 +80,7 @@ class FechaController extends Controller
 
         return response()->json([
             'ok'      => true,
-            'message' => 'Fechas eliminados correctamente.',
+            'message' => 'Fechas eliminadas correctamente.',
             'counts'  => $counts,
         ], 200);
     }

@@ -4,11 +4,11 @@ namespace App\Http\Requests\V1\Catalogo;
 
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
-use App\Http\Requests\V1\Catalogo\Concerns\NormalizesCatalogoInput;
+use App\Http\Requests\Concerns\NormalizesCommon;
 
 class BulkCatalogoRequest extends FormRequest
 {
-    use NormalizesCatalogoInput;
+    use NormalizesCommon;
 
     public function authorize(): bool { return true; }
 
@@ -23,10 +23,10 @@ class BulkCatalogoRequest extends FormRequest
             if (!is_array($i)) return $i;
 
             return [
-                'nivel_academico'    => $this->normNivel($i['nivel_academico'] ?? null),
-                'facultad'           => $this->normText($i['facultad'] ?? null),
-                'programa_academico' => $this->normText($i['programa_academico'] ?? null),
-            ];
+            'nivel_academico'    => $this->normLower($i['nivel_academico'] ?? $i['nivelAcademico'] ?? null),
+            'facultad'           => $this->normText($i['facultad'] ?? null),
+            'programa_academico' => $this->normText($i['programa_academico'] ?? $i['programaAcademico'] ?? null),
+        ];
         })->all();
 
         $this->merge(['items' => $items]);
@@ -57,7 +57,7 @@ class BulkCatalogoRequest extends FormRequest
                 if ($k === '|') continue;
 
                 if (isset($keys[$k])) {
-                    $dupes[] = [$keys[$k], $idx]; 
+                    $dupes[] = [$keys[$k], $idx];
                 } else {
                     $keys[$k] = $idx;
                 }

@@ -6,22 +6,23 @@ use Illuminate\Http\Resources\Json\JsonResource;
 
 class CatalogoResource extends JsonResource
 {
-    /**
-     * Transform the resource into an array.
-     */
     public function toArray($request): array
     {
         return [
-            'id'                  => $this->id,
-            'nivel_academico'     => $this->nivel_academico,
-            'facultad'            => $this->facultad,
-            'programa_academico'  => $this->programa_academico,
-            'fechacreacion'       => $this->fechacreacion ?? null,
-            'fechamodificacion'   => $this->fechamodificacion ?? null,
-            'usuariocreacion'     => $this->usuariocreacion ?? null,
-            'usuariomodificacion' => $this->usuariomodificacion ?? null,
-            'ipcreacion'          => $this->ipcreacion ?? null,
-            'ipmodificacion'      => $this->ipmodificacion ?? null,
+            'id'               => (string) $this->id,
+
+            'nivelAcademico'    => $this->nivel_academico,
+            'facultad'          => $this->facultad,
+            'programaAcademico' => $this->programa_academico,
+
+            'estado' => isset($this->estado) ? (bool) $this->estado : null,
+
+            'fechacreacion'       => $this->fechacreacion,
+            'fechamodificacion'   => $this->fechamodificacion,
+            'usuariocreacion'     => $this->usuariocreacion,
+            'usuariomodificacion' => $this->usuariomodificacion,
+            'ipcreacion'          => $this->ipcreacion,
+            'ipmodificacion'      => $this->ipmodificacion,
         ];
     }
 }

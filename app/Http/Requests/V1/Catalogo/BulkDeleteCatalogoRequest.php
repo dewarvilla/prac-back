@@ -13,8 +13,8 @@ class BulkDeleteCatalogoRequest extends FormRequest
         $ids = $this->input('ids', []);
         $ids = is_array($ids) ? $ids : [];
 
-        $ids = array_values(array_unique(array_map('intval', $ids)));
-        $ids = array_values(array_filter($ids, fn($id) => $id > 0));
+        $ids = array_values(array_unique(array_map('strval', $ids)));
+        $ids = array_values(array_filter($ids, fn($id) => trim($id) !== ''));
 
         $this->merge(['ids' => $ids]);
     }
@@ -23,7 +23,7 @@ class BulkDeleteCatalogoRequest extends FormRequest
     {
         return [
             'ids'   => ['required','array','min:1','max:500'],
-            'ids.*' => ['integer','min:1'],
+            'ids.*' => ['string','uuid','distinct','exists:catalogos,id'],
         ];
     }
 }

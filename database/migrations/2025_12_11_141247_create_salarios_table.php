@@ -6,19 +6,16 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
-    /**
-     * Run the migrations.
-     */
     public function up(): void
     {
         Schema::create('salarios', function (Blueprint $table) {
             $table->uuid('id')->primary();
-            
+
             $table->unsignedInteger('anio')->unique();
             $table->decimal('valor', 12, 2);
 
             // Auditoría
-            $table->boolean('estado')->default(true)->comment('');
+            $table->boolean('estado')->default(true);
             $table->timestamp('fechacreacion')->useCurrent();
             $table->timestamp('fechamodificacion')->useCurrent()->useCurrentOnUpdate();
             $table->unsignedBigInteger('usuariocreacion')->nullable();
@@ -28,13 +25,8 @@ return new class extends Migration
         });
     }
 
-    /**
-     * Reverse the migrations.
-     */
     public function down(): void
     {
-        Schema::dropIfExists('salarios');    
+        Schema::dropIfExists('salarios');
     }
 };
-
-

@@ -2,18 +2,28 @@
 
 namespace App\Repositories\Creacion;
 
-use App\Repositories\RepositoryInterface;
+use App\Models\Creacion;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
-use Illuminate\Support\Collection;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Collection;
 
-interface CreacionInterface extends RepositoryInterface
+interface CreacionInterface
 {
-    /** @return LengthAwarePaginator|Collection */
-    public function search(array $filters = [], int $perPage = 0);
+    public function query(): Builder;
 
-    public function upsertBulk(array $rows): void;
+    public function find(string $id): ?Creacion;
 
-    public function findByPairs(array $rows);
+    public function create(array $data): Creacion;
 
-    public function deleteByIds(array $ids): int;
+    public function update(string $id, array $data): ?Creacion;
+
+    public function delete(string $id): bool;
+
+    public function deleteWhereIn(array $ids): int;
+
+    public function getAll(array $filters = []): Collection;
+
+    public function paginate(array $filters = [], int $perPage = 15, array $appends = []): LengthAwarePaginator;
+
+    public function existsNombreInCatalogo(string $catalogoId, string $nombre, ?string $ignoreId = null): bool;
 }

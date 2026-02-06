@@ -3,40 +3,123 @@
 namespace App\Repositories\Catalogo;
 
 use App\Models\Catalogo;
-use App\Repositories\BaseRepository;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
-use Illuminate\Support\Collection;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
 
-class CatalogoRepository extends BaseRepository implements CatalogoInterface
+class CatalogoRepository implements CatalogoInterface
 {
-    public function __construct(Catalogo $model)
+    public function query(): Builder
     {
-        parent::__construct($model);
+        return Catalogo::query();
     }
 
-    /** @return LengthAwarePaginator|Collection */
-    public function search(array $filters = [], int $perPage = 0)
+    public function find(string $id): ?Catalogo
     {
-        $q = $this->query();
-        // Búsqueda texto libre "q"
-        if (!empty($filters['q'])) {
-            $term = (string) $filters['q'];
-            $op   = DB::connection()->getDriverName() === 'pgsql' ? 'ilike' : 'like';
-            $like = '%'.addcslashes($term, "%_\\").'%';
+        return Catalogo::find($id);
+    }
 
-            $q->where(function ($qq) use ($like, $term, $op) {
-                $qq->where('facultad', $op, $like)
-                   ->orWhere('programa_academico', $op, $like)
-                   ->orWhere('nivel_academico', $op, $like);
+    public function create(array $data): Catalogo
+    {
+        return Catalogo::create($data);
+    }
 
-                if (ctype_digit($term)) {
-                    $qq->orWhere('id', (int) $term);
-                }
+    public function update(string $id, array $data): ?Catalogo
+    {
+        $c = $this->find($id);
+        if (!$c) return null;
+
+        $c->update($data);
+        return $c->refresh();
+    }
+
+    public function delete(string $id): bool
+    {
+        $c = $this->find($id);
+        if (!$c) return false;
+
+        $c->delete();
+        return true;
+    }
+
+    public function deleteWhereIn(array $ids): int
+    {
+        return Catalogo::whereIn('id', $ids)->delete();
+    }
+
+    public function getAll(array $filters = []): Collection
+    {
+        return $this->applyFilters($this->query(), $filters)->get();
+    }
+
+    public function paginate(array $filters = [], int $perPage = 15, array $appends = []): LengthAwarePaginator
+    {
+        $q = $this->applyFilters($this->query(), $filters);
+        return $q->paginate($perPage)->appends($appends);
+    }
+
+    public function existsPair(string $facultad, string $programaAcademico, ?string $ignoreId = null): bool
+    {
+        $q = Catalogo::query()
+            ->where('facultad', $facultad)
+            ->where('programa_academico', $programaAcademico);
+
+        if ($ignoreId) $q->where('id', '!=', $ignoreId);
+
+        return $q->exists();
+    }
+
+    public function upsertBulk(array $rows): void
+    {
+        $rows = array_map(function ($r) {
+            unset($r['__key']);
+            return $r;
+        }, $rows);
+
+        Catalogo::upsert(
+            $rows,
+            ['programa_academico', 'facultad'],
+            [
+                'nivel_academico',
+                'estado',
+                'fechamodificacion',
+                'usuariomodificacion',
+                'ipmodificacion',
+            ]
+        );
+    }
+
+    public function findByPairs(array $rows): Collection
+    {
+        $q = Catalogo::query();
+
+        foreach ($rows as $r) {
+            $q->orWhere(function ($qq) use ($r) {
+                $qq->where('facultad', $r['facultad'])
+                   ->where('programa_academico', $r['programa_academico']);
             });
         }
 
-        // Filtros específicos
+        return $q->orderBy('facultad')->orderBy('programa_academico')->get();
+    }
+
+    private function applyFilters(Builder $q, array $filters): Builder
+    {
+        // q libre
+        if (!empty($filters['q'])) {
+            $term = (string) $filters['q'];
+            $driver = DB::connection()->getDriverName();
+            $op = $driver === 'pgsql' ? 'ilike' : 'like';
+            $like = '%'.addcslashes($term, "%_\\").'%';
+
+            $q->where(function (Builder $qq) use ($like, $op) {
+                $qq->where('facultad', $op, $like)
+                   ->orWhere('programa_academico', $op, $like)
+                   ->orWhere('nivel_academico', $op, $like);
+            });
+        }
+
         if (!empty($filters['nivel_academico'])) {
             $q->where('nivel_academico', $filters['nivel_academico']);
         }
@@ -49,56 +132,33 @@ class CatalogoRepository extends BaseRepository implements CatalogoInterface
             $q->where('programa_academico', 'like', '%'.$filters['programa_academico'].'%');
         }
 
-        // Sort
-        if (!empty($filters['sort'])) {
-            foreach (explode(',', $filters['sort']) as $part) {
-                $part = trim($part);
-                $dir  = str_starts_with($part, '-') ? 'desc' : 'asc';
-                $col  = ltrim($part, '-');
-                $q->orderBy($col, $dir);
-            }
-        } else {
-            $q->orderBy('facultad')->orderBy('programa_academico');
+        // lk (si tú lo estás usando como “like” explícito)
+        if (!empty($filters['facultad.lk'])) {
+            $q->where('facultad', 'like', '%'.$filters['facultad.lk'].'%');
+        }
+        if (!empty($filters['programa_academico.lk'])) {
+            $q->where('programa_academico', 'like', '%'.$filters['programa_academico.lk'].'%');
+        }
+        if (!empty($filters['nivel_academico.lk'])) {
+            $q->where('nivel_academico', 'like', '%'.$filters['nivel_academico.lk'].'%');
         }
 
-        if ($perPage > 0) {
-            return $q->paginate($perPage);
+        // sort normalizado
+        $sort = $filters['sort'] ?? 'facultad,programa_academico';
+        foreach (explode(',', (string)$sort) as $part) {
+            $part = trim($part);
+            if ($part === '') continue;
+
+            $dir = str_starts_with($part, '-') ? 'desc' : 'asc';
+            $col = ltrim($part, '-');
+
+            // whitelist simple para evitar orderBy de columnas raras
+            $allowed = ['id','facultad','programa_academico','nivel_academico','estado'];
+            if (!in_array($col, $allowed, true)) continue;
+
+            $q->orderBy($col, $dir);
         }
 
-        return $q->get();
-    }
-
-    public function upsertBulk(array $rows): void
-    {
-        DB::transaction(function () use ($rows) {
-            foreach (collect($rows)->chunk(500) as $slice) {
-                Catalogo::upsert(
-                    $slice->map(fn($r) => collect($r)->except('__key')->all())->all(),
-                    ['programa_academico', 'facultad'],
-                    ['nivel_academico', 'fechamodificacion', 'usuariomodificacion', 'ipmodificacion']
-                );
-            }
-        });
-    }
-
-    public function findByPairs(array $rows)
-    {
-        $q = Catalogo::query();
-
-        foreach ($rows as $r) {
-            $q->orWhere(function ($qq) use ($r) {
-                $qq->where('facultad', $r['facultad'])
-                   ->where('programa_academico', $r['programa_academico']);
-            });
-        }
-
-        return $q->orderBy('facultad')
-                 ->orderBy('programa_academico')
-                 ->get();
-    }
-
-    public function deleteByIds(array $ids): int
-    {
-        return Catalogo::whereIn('id', $ids)->delete();
+        return $q;
     }
 }

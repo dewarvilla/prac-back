@@ -4,49 +4,33 @@ namespace App\Http\Requests\V1\Catalogo;
 
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
-use Illuminate\Support\Str;
-use App\Http\Requests\V1\Catalogo\Concerns\NormalizesCatalogoInput;
+use App\Http\Requests\Concerns\NormalizesCommon;
+use App\Http\Requests\Concerns\NormalizesSort;
 
 class IndexCatalogoRequest extends FormRequest
 {
-    use NormalizesCatalogoInput;
+    use NormalizesCommon, NormalizesSort;
 
     public function authorize(): bool { return true; }
 
     protected function prepareForValidation(): void
     {
-        if ($this->has('q')) {
-            $this->merge(['q' => $this->normText($this->input('q'))]);
-        }
+        if ($this->has('q')) $this->merge(['q' => $this->normText($this->input('q'))]);
 
-        if ($this->has('facultad')) {
-            $this->merge(['facultad' => $this->normText($this->input('facultad'))]);
-        }
+        if ($this->has('facultad')) $this->merge(['facultad' => $this->normText($this->input('facultad'))]);
 
         if ($this->has('programa_academico')) {
             $this->merge(['programa_academico' => $this->normText($this->input('programa_academico'))]);
         }
 
         if ($this->has('nivel_academico')) {
-            $this->merge(['nivel_academico' => $this->normNivel($this->input('nivel_academico'))]);
+            $this->merge(['nivel_academico' => $this->normLower($this->input('nivel_academico'))]);
         }
 
-        // sort: "campo,-campo" -> snake_case
-        if ($this->has('sort')) {
-            $raw = (string) $this->input('sort');
-            $parts = array_filter(array_map('trim', explode(',', $raw)));
+        // sort global
+        $this->normalizeSortInput('sort');
 
-            $norm = array_map(function ($p) {
-                $desc = Str::startsWith($p, '-');
-                $p = ltrim($p, '-');
-                $p = Str::snake($p);
-                return $desc ? "-{$p}" : $p;
-            }, $parts);
-
-            $this->merge(['sort' => implode(',', $norm)]);
-        }
-
-        // lk (like) fields
+        // lk fields
         foreach (['facultad.lk','programa_academico.lk','nivel_academico.lk'] as $k) {
             if ($this->has($k)) {
                 $this->merge([$k => $this->normText($this->input($k))]);

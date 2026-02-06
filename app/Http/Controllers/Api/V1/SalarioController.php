@@ -7,14 +7,14 @@ use App\Http\Requests\V1\Salario\IndexSalarioRequest;
 use App\Http\Requests\V1\Salario\StoreSalarioRequest;
 use App\Http\Requests\V1\Salario\UpdateSalarioRequest;
 use App\Http\Requests\V1\Salario\BulkDeleteSalarioRequest;
-use App\Http\Resources\V1\Salario\SalarioCollection;
 use App\Http\Resources\V1\Salario\SalarioResource;
+use App\Http\Resources\V1\Salario\SalarioCollection;
 use App\Models\Salario;
 use App\Services\SalarioService;
 
 class SalarioController extends Controller
 {
-    public function __construct(private SalarioService $service)
+    public function __construct(private readonly SalarioService $service)
     {
         $this->middleware('permission:salarios.view')->only(['index','show']);
         $this->middleware('permission:salarios.create')->only(['store']);
@@ -25,11 +25,9 @@ class SalarioController extends Controller
     public function index(IndexSalarioRequest $request)
     {
         $perPage = (int) $request->query('per_page', 0);
+        $filters = $request->validated();
 
-        $result = $this->service->search(
-            $request->validated(),
-            $perPage
-        );
+        $result = $this->service->search($filters, $perPage, $request->query());
 
         return $perPage > 0
             ? new SalarioCollection($result)
@@ -40,7 +38,7 @@ class SalarioController extends Controller
     {
         $salario = $this->service->create(
             $request->validated(),
-            $request->user(),
+            auth()->user(),
             $request->ip()
         );
 
@@ -59,10 +57,9 @@ class SalarioController extends Controller
         $updated = $this->service->update(
             $salario->id,
             $request->validated(),
-            $request->user(),
+            auth()->user(),
             $request->ip()
         );
-
         abort_if(!$updated, 404);
 
         return new SalarioResource($updated);
@@ -78,9 +75,8 @@ class SalarioController extends Controller
 
     public function destroyBulk(BulkDeleteSalarioRequest $request)
     {
-        $counts = $this->service->destroyBulk(
-            $request->validated()['ids']
-        );
+        $ids = $request->validated()['ids'];
+        $counts = $this->service->destroyBulk($ids);
 
         return response()->json([
             'ok'      => true,

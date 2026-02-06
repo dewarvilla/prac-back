@@ -20,7 +20,7 @@ return new class extends Migration
             $table->text('recursos_necesarios');
             $table->text('justificacion');
 
-            $table->enum('estado_practica', [
+            $table->enum('estado_creacion', [
                 'borrador',
                 'en_aprobacion',
                 'aprobada',
@@ -28,12 +28,17 @@ return new class extends Migration
                 'creada',
             ])->default('borrador');
 
-            $table->string('estado_flujo')->default('departamento');
-            
+            // Etapa actual del flujo (clave canónica)
+            $table->enum('estado_flujo', [
+                'comite_acreditacion',
+                'consejo_facultad',
+                'consejo_academico',
+            ])->default('comite_acreditacion');
+
             $table->unique(['catalogo_id', 'nombre_practica'], 'creaciones_catalogo_nombre_unique');
 
             $table->index('nombre_practica');
-            $table->index('estado_practica');
+            $table->index('estado_creacion');
             $table->index('estado_flujo');
 
             // Auditoría

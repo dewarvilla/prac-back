@@ -27,7 +27,7 @@ class CreacionController extends Controller
         $perPage = (int) $request->query('per_page', 0);
         $filters = $request->validated();
 
-        $result = $this->service->search($filters, $perPage);
+        $result = $this->service->search($filters, $perPage, $request->query());
 
         return $perPage > 0
             ? new CreacionCollection($result)

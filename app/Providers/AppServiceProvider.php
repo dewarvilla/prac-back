@@ -14,13 +14,7 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        // ...
-        $this->app->bind(CatalogoInterface::class, CatalogoRepository::class);
-        $this->app->bind(CatalogoService::class, function ($app) {
-            return new CatalogoService(
-                $app->make(CatalogoInterface::class)
-            );
-        });
+        
     }
 
     /**

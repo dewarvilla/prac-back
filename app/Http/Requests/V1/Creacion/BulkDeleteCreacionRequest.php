@@ -12,10 +12,8 @@ class BulkDeleteCreacionRequest extends FormRequest
     {
         $ids = $this->input('ids', []);
         $ids = is_array($ids) ? $ids : [];
-
-        $ids = array_values(array_unique(array_map('intval', $ids)));
-        $ids = array_values(array_filter($ids, fn($id) => $id > 0));
-
+        $ids = array_values(array_unique(array_map('strval', $ids)));
+        $ids = array_values(array_filter($ids, fn($id) => $id !== ''));
         $this->merge(['ids' => $ids]);
     }
 
@@ -23,7 +21,7 @@ class BulkDeleteCreacionRequest extends FormRequest
     {
         return [
             'ids'   => ['required','array','min:1','max:1000'],
-            'ids.*' => ['integer','min:1','exists:creaciones,id'],
+            'ids.*' => ['string','uuid','distinct','exists:creaciones,id'],
         ];
     }
 

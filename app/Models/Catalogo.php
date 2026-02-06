@@ -30,6 +30,7 @@ class Catalogo extends Model
     ];
 
     protected $casts = [
+        'estado'            => 'boolean',
         'fechacreacion'     => 'datetime',
         'fechamodificacion' => 'datetime',
     ];
