@@ -171,6 +171,19 @@ class Handler extends ExceptionHandler
             ], 500);
         });
 
+        $this->renderable(function (ApiException $e, $request) {
+            if (! $this->wantsJson($request)) return;
+
+            return response()->json([
+                'ok'         => false,
+                'code'       => $e->statusCode,
+                'message'    => $e->getMessage(),
+                'error_code' => $e->errorCode,
+                'details'    => $e->details,
+                'hint'       => app()->isLocal() ? $e->getMessage() : null,
+            ], $e->statusCode);
+        });
+
         $this->renderable(function (HttpExceptionInterface $e, $request) {
             if ($this->wantsJson($request)) {
                 return response()->json([

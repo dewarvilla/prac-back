@@ -35,8 +35,7 @@ return new class extends Migration
         $table->unsignedBigInteger('usuariomodificacion')->nullable();
         $table->ipAddress('ipcreacion')->nullable();
         $table->ipAddress('ipmodificacion')->nullable();
-    });
-
+        });
     }
 
     /**
@@ -44,9 +43,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        //
-        {
-            Schema::dropIfExists('fechas');
-        }
+        Schema::dropIfExists('fechas');
     }
 };

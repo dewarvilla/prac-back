@@ -20,6 +20,7 @@ return new class extends Migration
             $table->text('recursos_necesarios');
             $table->text('justificacion');
 
+            // Estado macro para el proceso de creación
             $table->enum('estado_creacion', [
                 'borrador',
                 'en_aprobacion',
@@ -28,18 +29,10 @@ return new class extends Migration
                 'creada',
             ])->default('borrador');
 
-            // Etapa actual del flujo (clave canónica)
-            $table->enum('estado_flujo', [
-                'comite_acreditacion',
-                'consejo_facultad',
-                'consejo_academico',
-            ])->default('comite_acreditacion');
-
             $table->unique(['catalogo_id', 'nombre_practica'], 'creaciones_catalogo_nombre_unique');
 
             $table->index('nombre_practica');
             $table->index('estado_creacion');
-            $table->index('estado_flujo');
 
             // Auditoría
             $table->timestamp('fechacreacion')->useCurrent();

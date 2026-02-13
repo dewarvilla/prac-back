@@ -13,7 +13,16 @@ class ProgramacionRepository implements ProgramacionInterface
 {
     public function baseVisibleQuery(User $user): Builder
     {
-        return Programacion::visibleFor($user);
+        $q = Programacion::query()->with('creacion');
+
+        // Admin ve todo. Ajusta nombres de roles según los tuyos.
+        if ($user->hasRole('administrador') || $user->hasRole('super_admin')) {
+            return $q;
+        }
+
+        // Por ahora (y limpio), el docente ve lo suyo.
+        // Los aprobadores verán pendientes desde el módulo de inbox de approvals.
+        return $q->where('usuariocreacion', $user->id);
     }
 
     public function findVisible(string $id, User $user): ?Programacion
@@ -60,28 +69,35 @@ class ProgramacionRepository implements ProgramacionInterface
         return $q->paginate($perPage)->appends($appends);
     }
 
+    public function existsNombreFechas(string $nombre, string $fechaInicio, string $fechaFinalizacion, ?string $ignoreId = null): bool
+    {
+        $q = Programacion::query()
+            ->where('nombre_practica', $nombre)
+            ->whereDate('fecha_inicio', $fechaInicio)
+            ->whereDate('fecha_finalizacion', $fechaFinalizacion);
+
+        if ($ignoreId) $q->where('id', '!=', $ignoreId);
+
+        return $q->exists();
+    }
+
     private function applyFilters(Builder $q, array $filters): Builder
     {
-        // q libre
         if (!empty($filters['q'])) {
             $term   = (string) $filters['q'];
             $driver = DB::connection()->getDriverName();
             $op     = $driver === 'pgsql' ? 'ilike' : 'like';
             $like   = '%'.addcslashes($term, "%_\\").'%';
 
-            $q->where(function (Builder $qq) use ($like, $op, $term) {
+            $q->where(function (Builder $qq) use ($op, $like, $term) {
                 $qq->where('nombre_practica', $op, $like)
-                  ->orWhere('lugar_de_realizacion', $op, $like)
-                  ->orWhere('estado_practica', $op, $like)
-                  ->orWhere('estado_depart', $op, $like)
-                  ->orWhere('estado_postg', $op, $like)
-                  ->orWhere('estado_decano', $op, $like)
-                  ->orWhere('estado_jefe_postg', $op, $like)
-                  ->orWhere('estado_vice', $op, $like)
-                  ->orWhere('fecha_inicio', $op, $like)
-                  ->orWhere('fecha_finalizacion', $op, $like)
-                  ->orWhere('numero_estudiantes', $op, $like)
-                  ->orWhere('id', $op, $like);
+                   ->orWhere('lugar_de_realizacion', $op, $like)
+                   ->orWhere('estado_practica', $op, $like)
+                   ->orWhere('nivel_formacion', $op, $like)
+                   ->orWhere('fecha_inicio', $op, $like)
+                   ->orWhere('fecha_finalizacion', $op, $like)
+                   ->orWhere('numero_estudiantes', $op, $like)
+                   ->orWhere('id', $op, $like);
 
                 $low = mb_strtolower($term);
                 if (in_array($low, ['si','sí','true','1','no','false','0'], true)) {
@@ -91,13 +107,16 @@ class ProgramacionRepository implements ProgramacionInterface
             });
         }
 
-        // filtros específicos
         if (!empty($filters['nombre_practica'])) {
             $q->where('nombre_practica', 'like', '%'.$filters['nombre_practica'].'%');
         }
 
         if (!empty($filters['creacion_id'])) {
             $q->where('creacion_id', (string) $filters['creacion_id']);
+        }
+
+        if (!empty($filters['nivel_formacion'])) {
+            $q->where('nivel_formacion', $filters['nivel_formacion']);
         }
 
         if (array_key_exists('requiere_transporte', $filters) && $filters['requiere_transporte'] !== null) {
@@ -116,10 +135,10 @@ class ProgramacionRepository implements ProgramacionInterface
             $q->whereDate('fecha_finalizacion', '<=', $filters['fecha_finalizacion']);
         }
 
-        // sort multi (whitelist)
         $sort = $filters['sort'] ?? '-fechacreacion';
         $allowed = [
-            'id','nombre_practica','fecha_inicio','fecha_finalizacion','estado_practica','fechacreacion','fechamodificacion'
+            'id','nombre_practica','fecha_inicio','fecha_finalizacion',
+            'estado_practica','fechacreacion','fechamodificacion'
         ];
 
         foreach (explode(',', (string)$sort) as $part) {

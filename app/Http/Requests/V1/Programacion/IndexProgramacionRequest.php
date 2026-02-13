@@ -33,6 +33,7 @@ class IndexProgramacionRequest extends FormRequest
             'estado_practica','-estado_practica',
             'fechacreacion','-fechacreacion',
             'fechamodificacion','-fechamodificacion',
+            'nivel_formacion' => ['sometimes', Rule::in(['pregrado','posgrado'])],
         ];
 
         return [

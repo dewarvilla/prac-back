@@ -24,11 +24,18 @@ class IndexFechaRequest extends FormRequest
     public function rules(): array
     {
         $sortable = [
-            'id','-id','periodo','-periodo',
+            'id','-id','periodo','-periodo','estado','-estado',
+
             'fecha_apertura_preg','-fecha_apertura_preg',
             'fecha_cierre_docente_preg','-fecha_cierre_docente_preg',
+            'fecha_cierre_jefe_depart','-fecha_cierre_jefe_depart',
+            'fecha_cierre_decano','-fecha_cierre_decano',
+
             'fecha_apertura_postg','-fecha_apertura_postg',
             'fecha_cierre_docente_postg','-fecha_cierre_docente_postg',
+            'fecha_cierre_coordinador_postg','-fecha_cierre_coordinador_postg',
+            'fecha_cierre_jefe_postg','-fecha_cierre_jefe_postg',
+
             'fechacreacion','-fechacreacion',
             'fechamodificacion','-fechamodificacion',
         ];

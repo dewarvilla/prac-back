@@ -28,9 +28,8 @@ class IndexCreacionRequest extends FormRequest
         $this->normalizeSortInput('sort');
 
         if ($this->has('catalogo_id')) {
-        $this->merge(['catalogo_id' => (string) $this->input('catalogo_id')]);
-    }
-
+            $this->merge(['catalogo_id' => (string) $this->input('catalogo_id')]);
+        }
     }
 
     public function rules(): array
@@ -41,6 +40,7 @@ class IndexCreacionRequest extends FormRequest
             'estado_creacion','-estado_creacion',
             'catalogo_id','-catalogo_id',
             'fechacreacion','-fechacreacion',
+            'fechamodificacion','-fechamodificacion',
         ];
 
         return [
@@ -64,12 +64,9 @@ class IndexCreacionRequest extends FormRequest
             'recursos_necesarios' => ['sometimes','string'],
             'justificacion'       => ['sometimes','string'],
 
-            'estado_creacion' => ['sometimes', Rule::in(['borrador','en_aprobacion','aprobada','rechazada','creada'])],
-            'estado_flujo'    => ['sometimes', Rule::in(['comite_acreditacion','consejo_facultad','consejo_academico'])],
-
-            'estado_comite_acreditacion' => ['sometimes', Rule::in(['aprobada','rechazada','pendiente'])],
-            'estado_consejo_facultad'    => ['sometimes', Rule::in(['aprobada','rechazada','pendiente'])],
-            'estado_consejo_academico'   => ['sometimes', Rule::in(['aprobada','rechazada','pendiente'])],
+            'estado_creacion' => ['sometimes', Rule::in([
+                'borrador','en_aprobacion','aprobada','rechazada','creada'
+            ])],
 
             'nombre_practica.lk' => ['sometimes','string','max:255'],
         ];

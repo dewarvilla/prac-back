@@ -33,6 +33,7 @@ class StoreFechaRequest extends FormRequest
             'fecha_cierre_jefe_postg'        => ['required','date_format:Y-m-d','after_or_equal:fecha_cierre_coordinador_postg'],
 
             // auditoría/estado prohibidos desde cliente
+            'id'                  => ['prohibited'],
             'estado'              => ['prohibited'],
             'fechacreacion'       => ['prohibited'],
             'fechamodificacion'   => ['prohibited'],

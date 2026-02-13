@@ -17,7 +17,7 @@ class CreacionRepository implements CreacionInterface
 
     public function find(string $id): ?Creacion
     {
-        return $this->query()->find($id); // importante
+        return $this->query()->find($id);
     }
 
     public function create(array $data): Creacion
@@ -31,7 +31,7 @@ class CreacionRepository implements CreacionInterface
         if (!$c) return null;
 
         $c->update($data);
-        return $c->refresh(); // ojo: si quieres que refresh mantenga catalogo, puedes hacer ->load('catalogo')
+        return $c->refresh();
     }
 
     public function delete(string $id): bool
@@ -79,10 +79,6 @@ class CreacionRepository implements CreacionInterface
             $q->where('estado_creacion', $filters['estado_creacion']);
         }
 
-        if (!empty($filters['estado_flujo'])) {
-            $q->where('estado_flujo', $filters['estado_flujo']);
-        }
-
         if (!empty($filters['nombre_practica'])) {
             $q->where('nombre_practica', $filters['nombre_practica']);
         }
@@ -95,10 +91,10 @@ class CreacionRepository implements CreacionInterface
 
             $q->where(function (Builder $qq) use ($like, $op) {
                 $qq->where('nombre_practica', $op, $like)
-                   ->orWhereHas('catalogo', function ($qc) use ($like, $op) {
-                       $qc->where('programa_academico', $op, $like)
-                          ->orWhere('facultad', $op, $like);
-                   });
+                    ->orWhereHas('catalogo', function ($qc) use ($like, $op) {
+                        $qc->where('programa_academico', $op, $like)
+                            ->orWhere('facultad', $op, $like);
+                    });
             });
         }
 
@@ -111,7 +107,6 @@ class CreacionRepository implements CreacionInterface
             'catalogo_id',
             'nombre_practica',
             'estado_creacion',
-            'estado_flujo',
             'fechacreacion',
             'fechamodificacion',
         ];

@@ -30,6 +30,7 @@ class UpdateFechaRequest extends FormRequest
             'fecha_cierre_jefe_postg'        => ['date_format:Y-m-d','after_or_equal:fecha_cierre_coordinador_postg'],
 
             // prohibidos desde cliente
+            'id'                  => ['prohibited'],
             'estado'              => ['prohibited'],
             'fechacreacion'       => ['prohibited'],
             'fechamodificacion'   => ['prohibited'],

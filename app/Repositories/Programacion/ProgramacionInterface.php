@@ -25,4 +25,6 @@ interface ProgramacionInterface
     public function getAllVisible(User $user, array $filters = []): Collection;
 
     public function paginateVisible(User $user, array $filters = [], int $perPage = 15, array $appends = []): LengthAwarePaginator;
+
+    public function existsNombreFechas(string $nombre, string $fechaInicio, string $fechaFinalizacion, ?string $ignoreId = null): bool;
 }

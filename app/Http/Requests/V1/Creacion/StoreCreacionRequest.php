@@ -37,13 +37,13 @@ class StoreCreacionRequest extends FormRequest
             'justificacion'       => ['required','string'],
 
             // prohibidos desde cliente
-            'estado_creacion'            => ['prohibited'],
-            'estado_comite_acreditacion' => ['prohibited'],
-            'estado_consejo_facultad'    => ['prohibited'],
-            'estado_consejo_academico'   => ['prohibited'],
-            'facultad'                   => ['prohibited'],
-            'programa_academico'         => ['prohibited'],
-            'nivel_academico'            => ['prohibited'],
+            'estado_creacion'      => ['prohibited'],
+            'fechacreacion'        => ['prohibited'],
+            'fechamodificacion'    => ['prohibited'],
+            'usuariocreacion'      => ['prohibited'],
+            'usuariomodificacion'  => ['prohibited'],
+            'ipcreacion'           => ['prohibited'],
+            'ipmodificacion'       => ['prohibited'],
         ];
     }
 

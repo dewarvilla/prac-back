@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Str;
 
 class Salario extends Model
 {
@@ -18,7 +19,6 @@ class Salario extends Model
     public $incrementing = false;
 
     protected $fillable = [
-        'id',
         'estado',
         'anio',
         'valor',
@@ -35,4 +35,13 @@ class Salario extends Model
         'fechacreacion'     => 'datetime',
         'fechamodificacion' => 'datetime',
     ];
+
+    protected static function booted(): void
+    {
+        static::creating(function (self $model) {
+            if (empty($model->id)) {
+                $model->id = (string) Str::uuid();
+            }
+        });
+    }
 }

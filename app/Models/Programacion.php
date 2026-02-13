@@ -4,8 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Builder;
-use App\Models\User;
+use Illuminate\Support\Str;
 
 class Programacion extends Model
 {
@@ -20,27 +19,24 @@ class Programacion extends Model
     public $incrementing = false;
 
     protected $fillable = [
-        'id',
+        'creacion_id',
         'nombre_practica',
         'descripcion',
+        'requiere_transporte',
         'lugar_de_realizacion',
         'justificacion',
         'recursos_necesarios',
+        'numero_estudiantes',
+        'nivel_formacion',
         'estado_practica',
-        'estado_depart',
-        'estado_postg',
-        'estado_decano',
-        'estado_jefe_postg',
-        'estado_vice',
         'fecha_inicio',
         'fecha_finalizacion',
-        'requiere_transporte',
-        'creacion_id',
+
+        // Auditoría
         'usuariocreacion',
         'usuariomodificacion',
         'ipcreacion',
         'ipmodificacion',
-        'numero_estudiantes',
     ];
 
     protected $casts = [
@@ -51,22 +47,14 @@ class Programacion extends Model
         'fechamodificacion'   => 'datetime',
     ];
 
-    protected static function booted()
+    protected static function booted(): void
     {
-        static::creating(function ($m) {
-            if ($m->creacion && empty($m->nombre_practica)) {
-                $m->nombre_practica = $m->creacion->nombre_practica;
-            }
-        });
-
-        static::updating(function ($m) {
-            if ($m->isDirty('creacion_id') && $m->creacion) {
-                $m->nombre_practica = $m->creacion->nombre_practica;
+        static::creating(function (Programacion $model) {
+            if (empty($model->id)) {
+                $model->id = (string) Str::uuid();
             }
         });
     }
-
-    /* ================== RELACIONES ================== */
 
     public function creacion()
     {
@@ -101,81 +89,5 @@ class Programacion extends Model
     public function ajustes()
     {
         return $this->hasMany(Ajuste::class, 'programacion_id');
-    }
-
-    /* ================== SCOPE DE VISIBILIDAD ================== */
-
-    public function scopeVisibleFor(Builder $query, User $user): Builder
-    {
-        if ($user->hasRole('administrador') || $user->hasRole('super_admin')) {
-            return $query;
-        }
-
-        return $query->where(function (Builder $q) use ($user) {
-            $q->where('usuariocreacion', $user->id);
-
-            if ($user->can('programaciones.aprobar.departamento')) {
-                $q->orWhere(function (Builder $qx) {
-                    $qx->whereHas('creacion', function (Builder $qc) {
-                            $qc->whereRaw('LOWER(nivel_academico) = ?', ['pregrado']);
-                        })
-                        ->where('estado_depart', 'pendiente')
-                        ->where('estado_practica', '!=', 'rechazada');
-                });
-            }
-
-            if ($user->can('programaciones.aprobar.postgrados')) {
-                $q->orWhere(function (Builder $qx) {
-                    $qx->whereHas('creacion', function (Builder $qc) {
-                            $qc->whereRaw('LOWER(nivel_academico) = ?', ['postgrado']);
-                        })
-                        ->where('estado_postg', 'pendiente')
-                        ->where('estado_practica', '!=', 'rechazada');
-                });
-            }
-
-            if ($user->can('programaciones.aprobar.decano')) {
-                $q->orWhere(function (Builder $qx) {
-                    $qx->whereHas('creacion', function (Builder $qc) {
-                            $qc->whereRaw('LOWER(nivel_academico) = ?', ['pregrado']);
-                        })
-                        ->where('estado_depart', 'aprobada')
-                        ->where('estado_decano', 'pendiente')
-                        ->where('estado_practica', '!=', 'rechazada');
-                });
-            }
-
-            if ($user->can('programaciones.aprobar.jefe_postgrados')) {
-                $q->orWhere(function (Builder $qx) {
-                    $qx->whereHas('creacion', function (Builder $qc) {
-                            $qc->whereRaw('LOWER(nivel_academico) = ?', ['postgrado']);
-                        })
-                        ->where('estado_postg', 'aprobada')
-                        ->where('estado_jefe_postg', 'pendiente')
-                        ->where('estado_practica', '!=', 'rechazada');
-                });
-            }
-
-            if ($user->can('programaciones.aprobar.vicerrectoria')) {
-                $q->orWhere(function (Builder $qx) {
-                    $qx->where('estado_vice', 'pendiente')
-                        ->where('estado_practica', '!=', 'rechazada')
-                        ->where(function (Builder $q2) {
-                            $q2->where(function (Builder $qq) {
-                                $qq->whereHas('creacion', function (Builder $qc) {
-                                        $qc->whereRaw('LOWER(nivel_academico) = ?', ['pregrado']);
-                                    })
-                                   ->where('estado_decano', 'aprobada');
-                            })
-                            ->orWhere(function (Builder $qq) {
-                                $qq->whereHas('creacion', function (Builder $qc) {
-                                        $qc->whereRaw('LOWER(nivel_academico) = ?', ['postgrado']);
-                                    })
-                                   ->where('estado_jefe_postg', 'aprobada');
-                            });
-                        });
-                });
-            }
-        });
     }
 }

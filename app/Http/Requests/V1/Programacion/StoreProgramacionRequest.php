@@ -12,8 +12,10 @@ class StoreProgramacionRequest extends FormRequest
     {
         return [
             'creacion_id'          => ['required','uuid','exists:creaciones,id'],
+            
+            'nombre_practica'      => ['prohibited'],
+            'nivel_formacion'      => ['prohibited'],
 
-            'nombre_practica'      => ['nullable','string','max:255'], 
             'descripcion'          => ['required','string'],
             'lugar_de_realizacion' => ['nullable','string','max:255'],
             'justificacion'        => ['required','string'],
@@ -22,14 +24,17 @@ class StoreProgramacionRequest extends FormRequest
             'numero_estudiantes'   => ['required','integer','between:1,100'],
 
             'estado_practica'      => ['prohibited'],
-            'estado_depart'        => ['prohibited'],
-            'estado_postg'         => ['prohibited'],
-            'estado_decano'        => ['prohibited'],
-            'estado_jefe_postg'    => ['prohibited'],
-            'estado_vice'          => ['prohibited'],
 
             'fecha_inicio'         => ['required','date'],
             'fecha_finalizacion'   => ['required','date','after_or_equal:fecha_inicio'],
+
+            // auditoría prohibida
+            'fechacreacion'        => ['prohibited'],
+            'fechamodificacion'    => ['prohibited'],
+            'usuariocreacion'      => ['prohibited'],
+            'usuariomodificacion'  => ['prohibited'],
+            'ipcreacion'           => ['prohibited'],
+            'ipmodificacion'       => ['prohibited'],
         ];
     }
 }

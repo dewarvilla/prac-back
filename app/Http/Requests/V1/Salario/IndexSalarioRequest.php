@@ -45,6 +45,7 @@ class IndexSalarioRequest extends FormRequest
 
             'anio'  => ['sometimes','integer','digits:4','min:1900','max:3000'],
             'valor' => ['sometimes','numeric','min:0'],
+            'estado' => ['sometimes','boolean'],
         ];
     }
 }

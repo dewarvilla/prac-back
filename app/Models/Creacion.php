@@ -24,13 +24,12 @@ class Creacion extends Model
         'recursos_necesarios',
         'justificacion',
         'estado_creacion',
-        'estado_flujo',
         'usuariocreacion',
         'usuariomodificacion',
         'ipcreacion',
         'ipmodificacion',
     ];
-    
+
     protected $casts = [
         'fechacreacion'     => 'datetime',
         'fechamodificacion' => 'datetime',
@@ -60,4 +59,11 @@ class Creacion extends Model
     {
         return $this->hasMany(Programacion::class, 'creacion_id');
     }
+
+    // (Opcional) Cuando ya tengas approvals:
+    // public function approvalRequest()
+    // {
+    //     return $this->morphOne(\App\Models\ApprovalRequest::class, 'approvable')
+    //         ->where('is_active', true);
+    // }
 }

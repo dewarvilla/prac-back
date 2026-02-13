@@ -2,10 +2,11 @@
 
 namespace App\Services;
 
-use App\Exceptions\ConflictException;
+use App\Exceptions\Creaciones\CreacionDuplicateInCatalogoException;
 use App\Models\Catalogo;
 use App\Models\Creacion;
 use App\Repositories\Creacion\CreacionInterface;
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 
 class CreacionService
@@ -25,21 +26,19 @@ class CreacionService
     {
         return DB::transaction(function () use ($data, $user, $ip) {
 
-            $cat = Catalogo::findOrFail($data['catalogo_id']);
+            $catId  = (string) $data['catalogo_id'];
+            $nombre = (string) $data['nombre_practica'];
 
-            if ($this->repo->existsNombreInCatalogo((string)$cat->id, (string)$data['nombre_practica'])) {
-                throw new ConflictException('Ya existe una creación con ese nombre en el catálogo indicado.');
+            $cat = Catalogo::findOrFail($catId);
+
+            if ($this->repo->existsNombreInCatalogo((string)$cat->id, $nombre)) {
+                throw new CreacionDuplicateInCatalogoException((string)$cat->id, $nombre);
             }
 
             $now = now();
 
             $payload = $data + [
-                'facultad'           => $cat->facultad,
-                'programa_academico' => $cat->programa_academico,
-                'nivel_academico'    => $cat->nivel_academico ?? null,
-
                 'estado_creacion' => 'en_aprobacion',
-                'estado_flujo'    => 'comite_acreditacion',
 
                 // auditoría
                 'fechacreacion'       => $now,
@@ -52,9 +51,9 @@ class CreacionService
 
             try {
                 return $this->repo->create($payload)->fresh();
-            } catch (\Illuminate\Database\QueryException $e) {
+            } catch (QueryException $e) {
                 if (str_contains(strtolower($e->getMessage()), 'creaciones_catalogo_nombre_unique')) {
-                    throw new ConflictException('Ya existe una creación con ese nombre en el catálogo indicado.');
+                    throw new CreacionDuplicateInCatalogoException((string)$cat->id, $nombre);
                 }
                 throw $e;
             }
@@ -66,22 +65,15 @@ class CreacionService
         return DB::transaction(function () use ($id, $data, $user, $ip) {
 
             $current = $this->repo->find($id);
-            if (!$current) return null;
+            if (! $current) return null;
 
             $catalogoId = (string) ($data['catalogo_id'] ?? $current->catalogo_id);
             $nombre     = (string) ($data['nombre_practica'] ?? $current->nombre_practica);
 
             if (isset($data['catalogo_id']) || isset($data['nombre_practica'])) {
-                if ($this->repo->existsNombreInCatalogo($catalogoId, $nombre, $current->id)) {
-                    throw new ConflictException('Ya existe otra creación con ese nombre en el catálogo indicado.');
+                if ($this->repo->existsNombreInCatalogo($catalogoId, $nombre, (string)$current->id)) {
+                    throw new CreacionDuplicateInCatalogoException($catalogoId, $nombre, (string)$current->id);
                 }
-            }
-
-            if (isset($data['catalogo_id'])) {
-                $cat = Catalogo::findOrFail($data['catalogo_id']);
-                $data['facultad']           = $cat->facultad;
-                $data['programa_academico'] = $cat->programa_academico;
-                $data['nivel_academico']    = $cat->nivel_academico ?? null;
             }
 
             $payload = $data + [
@@ -90,7 +82,14 @@ class CreacionService
                 'ipmodificacion'      => $ip,
             ];
 
-            return $this->repo->update($id, $payload);
+            try {
+                return $this->repo->update($id, $payload);
+            } catch (QueryException $e) {
+                if (str_contains(strtolower($e->getMessage()), 'creaciones_catalogo_nombre_unique')) {
+                    throw new CreacionDuplicateInCatalogoException($catalogoId, $nombre, (string)$current->id);
+                }
+                throw $e;
+            }
         });
     }
 

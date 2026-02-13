@@ -4,16 +4,15 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-return new class extends Migration {
+return new class extends Migration
+{
     public function up(): void
     {
         Schema::create('programaciones', function (Blueprint $table) {
             $table->uuid('id')->primary();
 
-            // FK a creaciones (UUID)
-            $table->uuid('creacion_id');
-            $table->foreign('creacion_id')
-                ->references('id')->on('creaciones')
+            $table->foreignUuid('creacion_id')
+                ->constrained('creaciones')
                 ->cascadeOnUpdate()
                 ->restrictOnDelete();
 
@@ -26,33 +25,34 @@ return new class extends Migration {
             $table->text('recursos_necesarios');
             $table->unsignedInteger('numero_estudiantes');
 
-            $table->enum('estado_practica', [
-                'en_aprobacion','aprobada','rechazada','en_ejecucion',
-                'ejecutada','en_legalizacion','legalizada'
-            ])->default('en_aprobacion');
+            // Para escoger el flujo
+            $table->enum('nivel_formacion', ['pregrado', 'posgrado']);
 
-            $table->enum('estado_depart', ['aprobada','rechazada','pendiente'])->default('pendiente');
-            $table->enum('estado_postg', ['aprobada','rechazada','pendiente'])->default('pendiente');
-            $table->enum('estado_decano', ['aprobada','rechazada','pendiente'])->default('pendiente');
-            $table->enum('estado_jefe_postg', ['aprobada','rechazada','pendiente'])->default('pendiente');
-            $table->enum('estado_vice', ['aprobada','rechazada','pendiente'])->default('pendiente');
+            // Estado macro para el proceso de programación
+            $table->enum('estado_practica', [
+                'borrador',
+                'en_aprobacion',
+                'aprobada',
+                'rechazada',
+                'en_ejecucion',
+                'ejecutada',
+                'en_legalizacion',
+                'legalizada',
+            ])->default('borrador');
 
             $table->date('fecha_inicio');
             $table->date('fecha_finalizacion');
 
-            // índices para etapas
-            $table->index('estado_depart');
-            $table->index('estado_postg');
-            $table->index('estado_decano');
-            $table->index('estado_jefe_postg');
-            $table->index('estado_vice');
-
             $table->index('creacion_id');
             $table->index('nombre_practica');
+            $table->index('nivel_formacion');
             $table->index('estado_practica');
             $table->index(['fecha_inicio','fecha_finalizacion'], 'programaciones_fechas_idx');
 
-            $table->unique(['nombre_practica','fecha_inicio','fecha_finalizacion'], 'programaciones_nombre_fechas_unique');
+            $table->unique(
+                ['nombre_practica', 'fecha_inicio', 'fecha_finalizacion'],
+                'programaciones_nombre_fechas_unique'
+            );
 
             // Auditoría
             $table->timestamp('fechacreacion')->useCurrent();

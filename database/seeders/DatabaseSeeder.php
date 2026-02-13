@@ -12,6 +12,7 @@ class DatabaseSeeder extends Seeder
             RolesAndPermissionsSeeder::class,
             AdminUserSeeder::class,
             TestUsersSeeder::class,
+            ApprovalDefinitionsSeeder::class,
         ]);
 
         // Solo datos dummy en entornos locales (opcional)

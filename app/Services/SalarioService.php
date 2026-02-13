@@ -2,11 +2,12 @@
 
 namespace App\Services;
 
+use App\Exceptions\Salarios\SalarioAnioDuplicateException;
 use App\Models\Salario;
 use App\Models\User;
 use App\Repositories\Salario\SalarioInterface;
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Str;
 
 class SalarioService
 {
@@ -21,34 +22,71 @@ class SalarioService
 
     public function create(array $data, ?User $user, string $ip): Salario
     {
-        $now = now();
-        $uid = $user?->id ?? 0;
+        return DB::transaction(function () use ($data, $user, $ip) {
 
-        $payload = $data + [
-            'id'                  => (string) Str::uuid(),
-            'estado'              => true,
-            'fechacreacion'       => $now,
-            'fechamodificacion'   => $now,
-            'usuariocreacion'     => $uid,
-            'usuariomodificacion' => $uid,
-            'ipcreacion'          => $ip,
-            'ipmodificacion'      => $ip,
-        ];
+            $anio = (int) $data['anio'];
 
-        return $this->repo->create($payload)->fresh();
+            if ($this->repo->existsAnio($anio)) {
+                throw new SalarioAnioDuplicateException($anio);
+            }
+
+            $now = now();
+            $uid = $user?->id ?? 0;
+
+            $payload = $data + [
+                'estado'              => true,
+
+                'fechacreacion'       => $now,
+                'fechamodificacion'   => $now,
+                'usuariocreacion'     => $uid,
+                'usuariomodificacion' => $uid,
+                'ipcreacion'          => $ip,
+                'ipmodificacion'      => $ip,
+            ];
+
+            try {
+                return $this->repo->create($payload)->fresh();
+            } catch (QueryException $e) {
+                // carrera: otro request creó el mismo año en paralelo
+                if ($this->isUniqueAnioViolation($e)) {
+                    throw new SalarioAnioDuplicateException($anio);
+                }
+                throw $e;
+            }
+        });
     }
 
     public function update(string $id, array $data, ?User $user, string $ip): ?Salario
     {
-        $uid = $user?->id ?? 0;
+        return DB::transaction(function () use ($id, $data, $user, $ip) {
 
-        $payload = $data + [
-            'fechamodificacion'   => now(),
-            'usuariomodificacion' => $uid,
-            'ipmodificacion'      => $ip,
-        ];
+            if (!$this->repo->find($id)) return null;
 
-        return $this->repo->update($id, $payload);
+            if (array_key_exists('anio', $data)) {
+                $anio = (int) $data['anio'];
+
+                if ($this->repo->existsAnio($anio, $id)) {
+                    throw new SalarioAnioDuplicateException($anio, $id);
+                }
+            }
+
+            $uid = $user?->id ?? 0;
+
+            $payload = $data + [
+                'fechamodificacion'   => now(),
+                'usuariomodificacion' => $uid,
+                'ipmodificacion'      => $ip,
+            ];
+
+            try {
+                return $this->repo->update($id, $payload);
+            } catch (QueryException $e) {
+                if (array_key_exists('anio', $data) && $this->isUniqueAnioViolation($e)) {
+                    throw new SalarioAnioDuplicateException((int)$data['anio'], $id);
+                }
+                throw $e;
+            }
+        });
     }
 
     public function delete(string $id): bool
@@ -68,5 +106,18 @@ class SalarioService
                 'deleted'   => (int) $deleted,
             ];
         });
+    }
+
+    private function isUniqueAnioViolation(QueryException $e): bool
+    {
+        $msg = strtolower((string) $e->getMessage());
+
+        // nombre típico del constraint en Laravel: salarios_anio_unique
+        if (str_contains($msg, 'salarios_anio_unique')) return true;
+
+        // fallback genérico
+        if (str_contains($msg, 'duplicate entry') && str_contains($msg, 'anio')) return true;
+
+        return false;
     }
 }

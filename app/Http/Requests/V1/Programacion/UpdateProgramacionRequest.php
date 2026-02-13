@@ -12,7 +12,11 @@ class UpdateProgramacionRequest extends FormRequest
     {
         $rules = [
             'creacion_id'          => ['uuid','exists:creaciones,id'],
-            'nombre_practica'      => ['string','max:255'],
+
+            'nombre_practica'      => ['prohibited'],
+            'nivel_formacion'      => ['prohibited'],
+            'estado_practica'      => ['prohibited'],
+
             'descripcion'          => ['string'],
             'lugar_de_realizacion' => ['nullable','string','max:255'],
             'justificacion'        => ['string'],
@@ -20,15 +24,16 @@ class UpdateProgramacionRequest extends FormRequest
             'requiere_transporte'  => ['boolean'],
             'numero_estudiantes'   => ['integer','between:1,100'],
 
-            'estado_practica'      => ['prohibited'],
-            'estado_depart'        => ['prohibited'],
-            'estado_postg'         => ['prohibited'],
-            'estado_decano'        => ['prohibited'],
-            'estado_jefe_postg'    => ['prohibited'],
-            'estado_vice'          => ['prohibited'],
-
             'fecha_inicio'         => ['date'],
             'fecha_finalizacion'   => ['date','after_or_equal:fecha_inicio'],
+
+            // auditoría prohibida
+            'fechacreacion'        => ['prohibited'],
+            'fechamodificacion'    => ['prohibited'],
+            'usuariocreacion'      => ['prohibited'],
+            'usuariomodificacion'  => ['prohibited'],
+            'ipcreacion'           => ['prohibited'],
+            'ipmodificacion'       => ['prohibited'],
         ];
 
         if ($this->isMethod('patch')) {

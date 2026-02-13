@@ -2,12 +2,14 @@
 
 namespace App\Services;
 
+use App\Exceptions\Programaciones\ProgramacionDuplicateNombreFechasException;
+use App\Exceptions\Programaciones\ProgramacionNivelFormacionNoResueltoException;
 use App\Models\Creacion;
 use App\Models\Programacion;
 use App\Models\User;
 use App\Repositories\Programacion\ProgramacionInterface;
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Str;
 
 class ProgramacionService
 {
@@ -24,78 +26,103 @@ class ProgramacionService
 
     public function create(array $data, ?User $user, string $ip): Programacion
     {
-        $now = now();
-        $uid = $user?->id ?? 0;
+        return DB::transaction(function () use ($data, $user, $ip) {
 
-        $creacion = Creacion::query()->findOrFail($data['creacion_id']);
+            $now = now();
+            $uid = $user?->id ?? 0;
 
-        $payload = $data + [
-            'id'                  => (string) Str::uuid(),
-            'nombre_practica'     => $creacion->nombre_practica,
+            $creacion = Creacion::query()
+                ->with('catalogo')
+                ->findOrFail((string) $data['creacion_id']);
 
-            'estado_practica'     => 'en_aprobacion',
-            'estado_depart'       => 'pendiente',
-            'estado_postg'        => 'pendiente',
-            'estado_decano'       => 'pendiente',
-            'estado_jefe_postg'   => 'pendiente',
-            'estado_vice'         => 'pendiente',
+            $nombre = (string) $creacion->nombre_practica;
 
-            'fechacreacion'       => $now,
-            'fechamodificacion'   => $now,
-            'usuariocreacion'     => $uid,
-            'usuariomodificacion' => $uid,
-            'ipcreacion'          => $ip,
-            'ipmodificacion'      => $ip,
-        ];
+            $nivelAcademico = $creacion->catalogo?->nivel_academico;
+            $nivel = $this->resolveNivelFormacion($nivelAcademico); // pregrado|posgrado
 
-        return DB::transaction(function () use ($payload) {
-            $programacion = $this->repo->create($payload)->fresh();
-            $this->firstNotifier->notifyFirstApprover($programacion);
-            return $programacion;
+            $fi = (string) $data['fecha_inicio'];
+            $ff = (string) $data['fecha_finalizacion'];
+
+            if ($this->repo->existsNombreFechas($nombre, $fi, $ff)) {
+                throw new ProgramacionDuplicateNombreFechasException($nombre, $fi, $ff);
+            }
+
+            $payload = $data + [
+                'nombre_practica'   => $nombre,
+                'nivel_formacion'   => $nivel,
+                'estado_practica'   => 'en_aprobacion',
+
+                // Auditoría
+                'fechacreacion'       => $now,
+                'fechamodificacion'   => $now,
+                'usuariocreacion'     => $uid,
+                'usuariomodificacion' => $uid,
+                'ipcreacion'          => $ip,
+                'ipmodificacion'      => $ip,
+            ];
+
+            try {
+                return $this->repo->create($payload)->fresh();
+            } catch (QueryException $e) {
+                if (str_contains(strtolower($e->getMessage()), 'programaciones_nombre_fechas_unique')) {
+                    throw new ProgramacionDuplicateNombreFechasException($nombre, $fi, $ff);
+                }
+                throw $e;
+            }
         });
     }
 
     public function update(Programacion $programacion, array $data, ?User $user, string $ip): Programacion
     {
-        $uid = $user?->id ?? 0;
+        return DB::transaction(function () use ($programacion, $data, $user, $ip) {
 
-        $wasRejected      = $programacion->estado_practica === 'rechazada';
-        $esDocenteCreador = $user && $user->id === $programacion->usuariocreacion;
-        $esAdmin          = $user && ($user->hasRole('admin') || $user->hasRole('administrador') || $user->hasRole('super_admin'));
+            $uid = $user?->id ?? 0;
 
-        $payload = $data + [
-            'fechamodificacion'   => now(),
-            'usuariomodificacion' => $uid,
-            'ipmodificacion'      => $ip,
-        ];
+            // Si cambia creacion_id, recalcular nombre_practica y nivel_formacion
+            $nombre = $programacion->nombre_practica;
+            $nivel  = $programacion->nivel_formacion;
 
-        // Si cambian creacion_id, refrescar nombre_practica
-        if (array_key_exists('creacion_id', $payload)) {
-            $creacion = Creacion::query()->findOrFail($payload['creacion_id']);
-            $payload['nombre_practica'] = $creacion->nombre_practica;
-        }
+            if (array_key_exists('creacion_id', $data)) {
+                $creacion = Creacion::query()
+                    ->with('catalogo')
+                    ->findOrFail((string) $data['creacion_id']);
 
-        return DB::transaction(function () use ($programacion, $payload, $wasRejected, $esDocenteCreador, $esAdmin) {
+                $nombre = (string) $creacion->nombre_practica;
 
-            if ($wasRejected && ($esDocenteCreador || $esAdmin)) {
-                $payload['estado_practica']   = 'en_aprobacion';
-                $payload['estado_depart']     = 'pendiente';
-                $payload['estado_postg']      = 'pendiente';
-                $payload['estado_decano']     = 'pendiente';
-                $payload['estado_jefe_postg'] = 'pendiente';
-                $payload['estado_vice']       = 'pendiente';
-
-                $updated = $this->repo->update($programacion->id, $payload);
-                abort_if(!$updated, 404);
-
-                $fresh = $updated->fresh();
-                $this->firstNotifier->notifyFirstApprover($fresh);
-                return $fresh;
+                $nivelAcademico = $creacion->catalogo?->nivel_academico;
+                $nivel = $this->resolveNivelFormacion($nivelAcademico);
             }
 
-            $updated = $this->repo->update($programacion->id, $payload);
-            abort_if(!$updated, 404);
-            return $updated;
+            $fi = (string) ($data['fecha_inicio'] ?? $programacion->fecha_inicio?->format('Y-m-d'));
+            $ff = (string) ($data['fecha_finalizacion'] ?? $programacion->fecha_finalizacion?->format('Y-m-d'));
+
+            $touchUnique = array_key_exists('fecha_inicio', $data)
+                || array_key_exists('fecha_finalizacion', $data)
+                || array_key_exists('creacion_id', $data);
+
+            if ($touchUnique && $this->repo->existsNombreFechas($nombre, $fi, $ff, (string)$programacion->id)) {
+                throw new ProgramacionDuplicateNombreFechasException($nombre, $fi, $ff, (string)$programacion->id);
+            }
+
+            $payload = $data + [
+                'nombre_practica'     => $nombre,
+                'nivel_formacion'     => $nivel,
+
+                'fechamodificacion'   => now(),
+                'usuariomodificacion' => $uid,
+                'ipmodificacion'      => $ip,
+            ];
+
+            try {
+                $updated = $this->repo->update((string)$programacion->id, $payload);
+                abort_if(!$updated, 404);
+                return $updated;
+            } catch (QueryException $e) {
+                if (str_contains(strtolower($e->getMessage()), 'programaciones_nombre_fechas_unique')) {
+                    throw new ProgramacionDuplicateNombreFechasException($nombre, $fi, $ff, (string)$programacion->id);
+                }
+                throw $e;
+            }
         });
     }
 
@@ -116,5 +143,15 @@ class ProgramacionService
                 'deleted'   => (int) $deleted,
             ];
         });
+    }
+
+    private function resolveNivelFormacion(?string $nivelAcademico): string
+    {
+        $v = mb_strtolower(trim((string) $nivelAcademico));
+
+        if ($v === 'pregrado') return 'pregrado';
+        if (in_array($v, ['postgrado', 'posgrado'], true)) return 'posgrado';
+
+        throw new ProgramacionNivelFormacionNoResueltoException($nivelAcademico);
     }
 }

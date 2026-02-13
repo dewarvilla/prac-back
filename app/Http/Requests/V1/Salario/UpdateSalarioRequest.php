@@ -12,6 +12,12 @@ class UpdateSalarioRequest extends FormRequest
 
     public function authorize(): bool { return true; }
 
+    protected function prepareForValidation(): void
+    {
+        if ($this->has('anio'))  $this->merge(['anio'  => (int) $this->input('anio')]);
+        if ($this->has('valor')) $this->merge(['valor' => (float) $this->input('valor')]);
+    }
+
     public function rules(): array
     {
         $id = $this->route('salario')?->id;
@@ -19,13 +25,23 @@ class UpdateSalarioRequest extends FormRequest
         $rules = [
             'anio'  => ['integer','digits:4','min:1900','max:3000', Rule::unique('salarios','anio')->ignore($id)],
             'valor' => ['numeric','min:0'],
+
+            // prohibidos desde cliente
+            'id'                => ['prohibited'],
+            'estado'            => ['prohibited'],
+            'fechacreacion'     => ['prohibited'],
+            'fechamodificacion' => ['prohibited'],
+            'usuariocreacion'   => ['prohibited'],
+            'usuariomodificacion'=> ['prohibited'],
+            'ipcreacion'        => ['prohibited'],
+            'ipmodificacion'    => ['prohibited'],
         ];
 
         if ($this->isMethod('put')) {
             return [
                 'anio'  => ['required','integer','digits:4','min:1900','max:3000', Rule::unique('salarios','anio')->ignore($id)],
                 'valor' => ['required','numeric','min:0'],
-            ];
+            ] + $rules;
         }
 
         return $this->patchify($rules);

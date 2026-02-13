@@ -68,12 +68,20 @@ class FechaRepository implements FechaInterface
 
     private function applyFilters(Builder $q, array $filters): Builder
     {
+        if (array_key_exists('estado', $filters) && $filters['estado'] !== null) {
+            $q->where('estado', (bool) $filters['estado']);
+        }
+
         if (!empty($filters['periodo'])) {
             $q->where('periodo', $filters['periodo']);
         }
 
         if (!empty($filters['periodo.lk'])) {
             $q->where('periodo', 'like', '%'.$filters['periodo.lk'].'%');
+        }
+
+        if (array_key_exists('estado', $filters) && $filters['estado'] !== null) {
+            $q->where('estado', (bool) $filters['estado']);
         }
 
         // búsqueda libre
@@ -85,19 +93,31 @@ class FechaRepository implements FechaInterface
 
             $q->where(function (Builder $qq) use ($like, $op) {
                 $qq->where('periodo', $op, $like)
-                   ->orWhere('fecha_apertura_preg', $op, $like)
-                   ->orWhere('fecha_cierre_docente_preg', $op, $like)
-                   ->orWhere('fecha_apertura_postg', $op, $like)
-                   ->orWhere('fecha_cierre_docente_postg', $op, $like);
+                ->orWhere('fecha_apertura_preg', $op, $like)
+                ->orWhere('fecha_cierre_docente_preg', $op, $like)
+                ->orWhere('fecha_cierre_jefe_depart', $op, $like)
+                ->orWhere('fecha_cierre_decano', $op, $like)
+                ->orWhere('fecha_apertura_postg', $op, $like)
+                ->orWhere('fecha_cierre_docente_postg', $op, $like)
+                ->orWhere('fecha_cierre_coordinador_postg', $op, $like)
+                ->orWhere('fecha_cierre_jefe_postg', $op, $like);
             });
         }
 
-        // sort multi (como catalogo)
         $sort = $filters['sort'] ?? '-fechacreacion';
         $allowed = [
-            'id','periodo',
-            'fecha_apertura_preg','fecha_cierre_docente_preg',
-            'fecha_apertura_postg','fecha_cierre_docente_postg',
+            'id','periodo','estado',
+
+            'fecha_apertura_preg',
+            'fecha_cierre_docente_preg',
+            'fecha_cierre_jefe_depart',
+            'fecha_cierre_decano',
+
+            'fecha_apertura_postg',
+            'fecha_cierre_docente_postg',
+            'fecha_cierre_coordinador_postg',
+            'fecha_cierre_jefe_postg',
+
             'fechacreacion','fechamodificacion',
         ];
 
