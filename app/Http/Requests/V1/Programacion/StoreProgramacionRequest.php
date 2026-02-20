@@ -28,13 +28,11 @@ class StoreProgramacionRequest extends FormRequest
             'fecha_inicio'         => ['required','date'],
             'fecha_finalizacion'   => ['required','date','after_or_equal:fecha_inicio'],
 
-            // auditoría prohibida
-            'fechacreacion'        => ['prohibited'],
-            'fechamodificacion'    => ['prohibited'],
-            'usuariocreacion'      => ['prohibited'],
-            'usuariomodificacion'  => ['prohibited'],
-            'ipcreacion'           => ['prohibited'],
-            'ipmodificacion'       => ['prohibited'],
+            // prohibidos desde cliente
+            'id'         => ['prohibited'],
+            'estado'     => ['prohibited'],
+            'created_at' => ['prohibited'],
+            'updated_at' => ['prohibited'],
         ];
     }
 }

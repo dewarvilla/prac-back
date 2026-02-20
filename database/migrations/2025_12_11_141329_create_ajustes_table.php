@@ -17,11 +17,10 @@ return new class extends Migration
             $table->date('fecha_ajuste');
 
             $table->enum('estado_ajuste', [
-                'borrador',
                 'en_aprobacion',
                 'aprobada',
                 'rechazada',
-            ])->default('borrador');
+            ])->default('en_aprobacion');
 
             $table->string('estado_flujo')->nullable();
 
@@ -36,13 +35,8 @@ return new class extends Migration
             $table->index('estado_ajuste');
             $table->index('estado_flujo');
 
-            // Auditoría
-            $table->timestamp('fechacreacion')->useCurrent();
-            $table->timestamp('fechamodificacion')->useCurrent()->useCurrentOnUpdate();
-            $table->unsignedBigInteger('usuariocreacion')->nullable();
-            $table->unsignedBigInteger('usuariomodificacion')->nullable();
-            $table->ipAddress('ipcreacion')->nullable();
-            $table->ipAddress('ipmodificacion')->nullable();
+            $table->boolean('estado')->default(true);
+            $table->timestamps();
         });
     }
 

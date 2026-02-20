@@ -10,37 +10,28 @@ return new class extends Migration {
         Schema::create('approval_requests', function (Blueprint $table) {
             $table->uuid('id')->primary();
 
-            // Polimórfico UUID: approvable_type (string) + approvable_id (uuid)
             $table->uuidMorphs('approvable');
 
-            // Definición usada para esta solicitud
             $table->foreignUuid('approval_definition_id')
                 ->constrained('approval_definitions')
                 ->cascadeOnUpdate()
                 ->restrictOnDelete();
 
             $table->enum('status', ['pending', 'approved', 'rejected', 'cancelled'])
-                  ->default('pending');
+                ->default('pending');
 
             $table->unsignedInteger('current_step_order')->default(1);
+            $table->boolean('is_current')->default(true);
+            $table->unsignedBigInteger('requested_by')->nullable();
+            $table->timestamp('closed_at')->nullable();
 
-            // 1 solicitud activa por aprobable
-            $table->boolean('is_active')->default(true);
+            $table->json('meta')->nullable();
 
-            $table->index(['status', 'is_active']);
+            $table->index(['status', 'is_current']);
             $table->index(['approval_definition_id', 'status']);
+            $table->unique(['approvable_type', 'approvable_id', 'is_current'], 'approval_one_current');
 
-            $table->unsignedTinyInteger('active_key')->nullable(); // 1 cuando activa, null cuando cerrada
-            $table->index(['status', 'active_key']);
-            $table->unique(['approvable_type', 'approvable_id', 'active_key'], 'approval_one_active');
-
-            // Auditoría 
-            $table->timestamp('fechacreacion')->useCurrent();
-            $table->timestamp('fechamodificacion')->useCurrent()->useCurrentOnUpdate();
-            $table->unsignedBigInteger('usuariocreacion')->nullable();
-            $table->unsignedBigInteger('usuariomodificacion')->nullable();
-            $table->ipAddress('ipcreacion')->nullable();
-            $table->ipAddress('ipmodificacion')->nullable();
+            $table->timestamps();
         });
     }
 

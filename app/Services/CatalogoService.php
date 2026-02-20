@@ -2,54 +2,29 @@
 
 namespace App\Services;
 
-use App\Models\Catalogo;
-use App\Models\User;
 use App\Repositories\Catalogo\CatalogoInterface;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
 class CatalogoService
 {
-    public function __construct(private readonly CatalogoInterface $repo)
-    {
-    }
+    public function __construct(private readonly CatalogoInterface $repo) {}
 
-    public function search(array $filters = [], int $perPage = 0)
+    public function search(array $filters = [], int $perPage = 0, array $appends = [])
     {
         return $perPage > 0
-            ? $this->repo->paginate($filters, $perPage, $filters)
+            ? $this->repo->paginate($filters, $perPage, $appends ?: $filters)
             : $this->repo->getAll($filters);
     }
 
-    public function create(array $data, ?User $user, string $ip): Catalogo
+    public function create(array $data)
     {
-        $now = now();
-        $uid = $user?->id ?? 0;
-
-        $payload = $data + [
-            'estado'              => true,
-            'fechacreacion'       => $now,
-            'fechamodificacion'   => $now,
-            'usuariocreacion'     => $uid,
-            'usuariomodificacion' => $uid,
-            'ipcreacion'          => $ip,
-            'ipmodificacion'      => $ip,
-        ];
-
-        return $this->repo->create($payload)->fresh();
+        return $this->repo->create($data + ['estado' => true])->fresh();
     }
 
-    public function update(string $id, array $data, ?User $user, string $ip): ?Catalogo
+    public function update(string $id, array $data)
     {
-        $uid = $user?->id ?? 0;
-
-        $payload = $data + [
-            'fechamodificacion'   => now(),
-            'usuariomodificacion' => $uid,
-            'ipmodificacion'      => $ip,
-        ];
-
-        return $this->repo->update($id, $payload);
+        return $this->repo->update($id, $data);
     }
 
     public function delete(string $id): bool
@@ -60,14 +35,12 @@ class CatalogoService
     /**
      * @return array{rows:\Illuminate\Database\Eloquent\Collection, meta:array}
      */
-    public function storeBulk(array $items, ?User $user, string $ip): array
+    public function storeBulk(array $items): array
     {
         $now = now();
-        $uid = $user?->id ?? 0;
-
         $normalize = fn(?string $s) => $s === null ? null : preg_replace('/\s+/u', ' ', trim($s));
 
-        $rows = collect($items)->map(function ($i) use ($now, $uid, $ip, $normalize) {
+        $rows = collect($items)->map(function ($i) use ($now, $normalize) {
             $fac = $normalize($i['facultad'] ?? '');
             $pro = $normalize($i['programa_academico'] ?? '');
 
@@ -78,46 +51,20 @@ class CatalogoService
                 'programa_academico' => $pro,
                 'estado'             => true,
 
-                'fechacreacion'       => $now,
-                'usuariocreacion'     => $uid,
-                'ipcreacion'          => $ip,
-                'fechamodificacion'   => $now,
-                'usuariomodificacion' => $uid,
-                'ipmodificacion'      => $ip,
+                'created_at' => $now,
+                'updated_at' => $now,
 
-                '__key'              => mb_strtolower($fac).'|'.mb_strtolower($pro),
+                '__key' => mb_strtolower($fac).'|'.mb_strtolower($pro),
             ];
         });
 
-        // detectar cuáles ya existían
-        $existentes = Catalogo::query()
-            ->where(function ($q) use ($rows) {
-                foreach ($rows->pluck('__key')->unique() as $key) {
-                    [$facKey, $proKey] = explode('|', $key, 2);
-                    $q->orWhere(function ($qq) use ($facKey, $proKey) {
-                        $qq->whereRaw('LOWER(facultad) = ?', [$facKey])
-                           ->whereRaw('LOWER(programa_academico) = ?', [$proKey]);
-                    });
-                }
-            })
-            ->get()
-            ->mapWithKeys(fn($c) => [mb_strtolower($c->facultad).'|'.mb_strtolower($c->programa_academico) => true]);
-
-        $marcas = $rows->map(fn($r) => [
-            'key'      => $r['__key'],
-            'existing' => $existentes->has($r['__key']),
-        ]);
-
         $this->repo->upsertBulk($rows->all());
-
         $affected = $this->repo->findByPairs($rows->all());
 
         return [
             'rows' => $affected,
             'meta' => [
                 'processed' => $rows->count(),
-                'created'   => $marcas->where('existing', false)->count(),
-                'updated'   => $marcas->where('existing', true)->count(),
                 'timestamp' => $now->toIso8601String(),
             ],
         ];

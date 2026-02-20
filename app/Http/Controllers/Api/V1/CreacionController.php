@@ -29,9 +29,11 @@ class CreacionController extends Controller
 
         $result = $this->service->search($filters, $perPage, $request->query());
 
-        return $perPage > 0
-            ? new CreacionCollection($result)
-            : CreacionResource::collection($result);
+        $resource = $perPage > 0
+            ? new CreacionCollection($result)            
+            : CreacionResource::collection($result);     
+
+        return $this->ok($resource, 'OK', 200);
     }
 
     public function store(StoreCreacionRequest $request)
@@ -42,14 +44,18 @@ class CreacionController extends Controller
             $request->ip()
         );
 
-        return (new CreacionResource($creacion))
-            ->response()
-            ->setStatusCode(201);
+        $res = new CreacionResource($creacion->load('catalogo'));
+
+        return $this->ok($res, 'Creación registrada.', 201);
     }
 
     public function show(Creacion $creacion)
     {
-        return new CreacionResource($creacion->load('catalogo'));
+        return $this->ok(
+            new CreacionResource($creacion->load('catalogo')),
+            'OK',
+            200
+        );
     }
 
     public function update(UpdateCreacionRequest $request, Creacion $creacion)
@@ -60,17 +66,21 @@ class CreacionController extends Controller
             auth()->user(),
             $request->ip()
         );
+
         abort_if(!$updated, 404);
 
-        return new CreacionResource($updated);
+        return $this->ok(
+            new CreacionResource($updated->load('catalogo')),
+            'Creación actualizada.',
+            200
+        );
     }
 
     public function destroy(Creacion $creacion)
     {
         $ok = $this->service->delete($creacion->id);
         abort_if(!$ok, 404);
-
-        return response()->noContent();
+        return $this->ok(null, 'Creación eliminada.', 200);
     }
 
     public function destroyBulk(BulkDeleteCreacionRequest $request)
@@ -78,10 +88,10 @@ class CreacionController extends Controller
         $ids = $request->validated()['ids'];
         $counts = $this->service->destroyBulk($ids);
 
-        return response()->json([
-            'ok'      => true,
-            'message' => 'Creaciones eliminadas correctamente.',
-            'counts'  => $counts,
-        ], 200);
+        return $this->ok(
+            data: ['counts' => $counts],
+            message: 'Creaciones eliminadas correctamente.',
+            status: 200
+        );
     }
 }

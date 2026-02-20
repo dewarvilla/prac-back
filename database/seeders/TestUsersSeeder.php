@@ -12,7 +12,6 @@ class TestUsersSeeder extends Seeder
 {
     public function run(): void
     {
-        // AJUSTA estos nombres a los roles reales de tu app
         $roles = [
             'administrador',
             'docente',

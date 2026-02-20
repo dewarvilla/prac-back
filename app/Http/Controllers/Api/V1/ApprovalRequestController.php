@@ -18,9 +18,11 @@ class ApprovalRequestController extends Controller
 
     public function show(ApprovalRequest $approvalRequest)
     {
-        return new ApprovalRequestResource(
+        $res = new ApprovalRequestResource(
             $approvalRequest->load(['definition','steps'])
         );
+
+        return $this->ok($res, 'OK', 200);
     }
 
     public function approve(ActApprovalRequest $request, ApprovalRequest $approvalRequest)
@@ -32,7 +34,9 @@ class ApprovalRequestController extends Controller
             $request->ip()
         );
 
-        return new ApprovalRequestResource($updated);
+        $res = new ApprovalRequestResource($updated->load(['definition','steps']));
+
+        return $this->ok($res, 'Aprobación registrada.', 200);
     }
 
     public function reject(ActApprovalRequest $request, ApprovalRequest $approvalRequest)
@@ -44,7 +48,9 @@ class ApprovalRequestController extends Controller
             $request->ip()
         );
 
-        return new ApprovalRequestResource($updated);
+        $res = new ApprovalRequestResource($updated->load(['definition','steps']));
+
+        return $this->ok($res, 'Rechazo registrado.', 200);
     }
 
     public function cancel(ActApprovalRequest $request, ApprovalRequest $approvalRequest)
@@ -55,6 +61,8 @@ class ApprovalRequestController extends Controller
             $request->ip()
         );
 
-        return new ApprovalRequestResource($updated);
+        $res = new ApprovalRequestResource($updated->load(['definition','steps']));
+
+        return $this->ok($res, 'Solicitud cancelada.', 200);
     }
 }

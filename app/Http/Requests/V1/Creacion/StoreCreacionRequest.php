@@ -25,32 +25,30 @@ class StoreCreacionRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'catalogo_id' => ['required','uuid','exists:catalogos,id'],
+            'catalogo_id' => ['bail','required','uuid','exists:catalogos,id'],
 
             'nombre_practica' => [
-                'required','string','max:255',
+                'bail','required','string','max:255',
                 Rule::unique('creaciones', 'nombre_practica')
                     ->where(fn($q) => $q->where('catalogo_id', $this->input('catalogo_id'))),
             ],
 
-            'recursos_necesarios' => ['required','string'],
-            'justificacion'       => ['required','string'],
+            'recursos_necesarios' => ['bail','required','string'],
+            'justificacion'       => ['bail','required','string'],
 
             // prohibidos desde cliente
-            'estado_creacion'      => ['prohibited'],
-            'fechacreacion'        => ['prohibited'],
-            'fechamodificacion'    => ['prohibited'],
-            'usuariocreacion'      => ['prohibited'],
-            'usuariomodificacion'  => ['prohibited'],
-            'ipcreacion'           => ['prohibited'],
-            'ipmodificacion'       => ['prohibited'],
+            'id'           => ['prohibited'],
+            'estado'       => ['prohibited'],
+            'created_at'   => ['prohibited'],
+            'updated_at'   => ['prohibited'],
+            'estado_creacion' => ['prohibited'],
         ];
     }
 
     public function messages(): array
     {
         return [
-            'nombre_practica.unique' => 'Ya existe una creación con ese nombre en el catálogo indicado.',
+            'nombre_practica.unique' => 'Ya existe una práctica con ese nombre en el programa académico indicado.',
         ];
     }
 }

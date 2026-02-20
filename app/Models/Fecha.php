@@ -6,15 +6,14 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Str;
 use Carbon\Carbon;
+use App\Models\Concerns\Auditable;
 
 class Fecha extends Model
 {
     use HasFactory;
+    use Auditable;
 
     protected $table = 'fechas';
-
-    const CREATED_AT = 'fechacreacion';
-    const UPDATED_AT = 'fechamodificacion';
 
     protected $keyType = 'string';
     public $incrementing = false;
@@ -30,10 +29,6 @@ class Fecha extends Model
         'fecha_cierre_docente_postg',
         'fecha_cierre_coordinador_postg',
         'fecha_cierre_jefe_postg',
-        'usuariocreacion',
-        'usuariomodificacion',
-        'ipcreacion',
-        'ipmodificacion',
     ];
 
     protected $casts = [
@@ -47,8 +42,8 @@ class Fecha extends Model
         'fecha_cierre_docente_postg'     => 'date',
         'fecha_cierre_coordinador_postg' => 'date',
         'fecha_cierre_jefe_postg'        => 'date',
-        'fechacreacion'                  => 'datetime',
-        'fechamodificacion'              => 'datetime',
+        'created_at'                     => 'datetime',
+        'updated_at'                     => 'datetime',
     ];
 
     protected static function booted(): void

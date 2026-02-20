@@ -5,10 +5,11 @@ namespace App\Http\Requests\V1\Creacion;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 use App\Http\Requests\Concerns\TrimsStrings;
+use App\Http\Requests\Concerns\AppliesPatchRules;
 
 class UpdateCreacionRequest extends FormRequest
 {
-    use TrimsStrings;
+    use TrimsStrings, AppliesPatchRules;
 
     public function authorize(): bool { return true; }
 
@@ -34,49 +35,54 @@ class UpdateCreacionRequest extends FormRequest
 
     public function rules(): array
     {
-        $id = $this->route('creacion')?->id;
+        $creacion = $this->route('creacion');
+        $id = $creacion?->id;
 
         $base = [
-            'catalogo_id'         => ['uuid','exists:catalogos,id'],
-            'nombre_practica'     => ['string','max:255'],
-            'recursos_necesarios' => ['string'],
-            'justificacion'       => ['string'],
+            'catalogo_id'         => ['bail','uuid','exists:catalogos,id'],
+            'nombre_practica'     => ['bail','string','max:255'],
+            'recursos_necesarios' => ['bail','string'],
+            'justificacion'       => ['bail','string'],
 
             // prohibidos desde cliente
-            'estado_creacion'      => ['prohibited'],
-            'fechacreacion'        => ['prohibited'],
-            'fechamodificacion'    => ['prohibited'],
-            'usuariocreacion'      => ['prohibited'],
-            'usuariomodificacion'  => ['prohibited'],
-            'ipcreacion'           => ['prohibited'],
-            'ipmodificacion'       => ['prohibited'],
+            'id'             => ['prohibited'],
+            'estado'         => ['prohibited'],
+            'created_at'     => ['prohibited'],
+            'updated_at'     => ['prohibited'],
+            'estado_creacion'=> ['prohibited'],
         ];
 
-        $touchesUnique = $this->filled('nombre_practica') || $this->filled('catalogo_id') || $this->isMethod('put');
+        $touchesUnique =
+            $this->filled('nombre_practica') ||
+            $this->filled('catalogo_id') ||
+            $this->isMethod('put');
+
         if ($touchesUnique) {
-            $catalogoId = (string) $this->input('catalogo_id', $this->route('creacion')?->catalogo_id);
+            $catalogoId = (string) $this->input('catalogo_id', $creacion?->catalogo_id);
 
             $base['nombre_practica'][] = Rule::unique('creaciones', 'nombre_practica')
                 ->where(fn($q) => $q->where('catalogo_id', $catalogoId))
                 ->ignore($id);
         }
 
+        // PATCH
         if ($this->isMethod('patch')) {
-            return collect($base)->map(fn($r) => array_merge(['sometimes'], $r))->all();
+            return $this->patchify($base);
         }
 
+        // PUT
         return array_merge($base, [
-            'catalogo_id'         => ['required','uuid','exists:catalogos,id'],
-            'nombre_practica'     => ['required','string','max:255'],
-            'recursos_necesarios' => ['required','string'],
-            'justificacion'       => ['required','string'],
+            'catalogo_id'         => ['bail','required','uuid','exists:catalogos,id'],
+            'nombre_practica'     => ['bail','required','string','max:255'],
+            'recursos_necesarios' => ['bail','required','string'],
+            'justificacion'       => ['bail','required','string'],
         ]);
     }
 
     public function messages(): array
     {
         return [
-            'nombre_practica.unique' => 'Ya existe otra creación con ese nombre en el catálogo indicado.',
+            'nombre_practica.unique' => 'Ya existe una práctica con ese nombre en el programa académico indicado.',
         ];
     }
 }

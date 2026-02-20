@@ -22,7 +22,9 @@ class IndexCreacionRequest extends FormRequest
             'justificacion',
             'nombre_practica.lk',
         ] as $k) {
-            if ($this->has($k)) $this->merge([$k => $this->normText($this->input($k))]);
+            if ($this->has($k)) {
+                $this->merge([$k => $this->normText($this->input($k))]);
+            }
         }
 
         $this->normalizeSortInput('sort');
@@ -30,17 +32,24 @@ class IndexCreacionRequest extends FormRequest
         if ($this->has('catalogo_id')) {
             $this->merge(['catalogo_id' => (string) $this->input('catalogo_id')]);
         }
+
+        if ($this->has('estado')) {
+            $this->merge([
+                'estado' => filter_var($this->input('estado'), FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE),
+            ]);
+        }
     }
 
     public function rules(): array
     {
         $sortable = [
-            'id', '-id',
+            'id','-id',
             'nombre_practica','-nombre_practica',
             'estado_creacion','-estado_creacion',
+            'estado','-estado',
             'catalogo_id','-catalogo_id',
-            'fechacreacion','-fechacreacion',
-            'fechamodificacion','-fechamodificacion',
+            'created_at','-created_at',
+            'updated_at','-updated_at',
         ];
 
         return [
@@ -64,8 +73,10 @@ class IndexCreacionRequest extends FormRequest
             'recursos_necesarios' => ['sometimes','string'],
             'justificacion'       => ['sometimes','string'],
 
+            'estado' => ['sometimes','nullable','boolean'],
+
             'estado_creacion' => ['sometimes', Rule::in([
-                'borrador','en_aprobacion','aprobada','rechazada','creada'
+                'en_aprobacion','aprobada','rechazada','creada'
             ])],
 
             'nombre_practica.lk' => ['sometimes','string','max:255'],

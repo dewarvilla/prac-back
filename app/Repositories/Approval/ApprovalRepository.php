@@ -13,7 +13,7 @@ class ApprovalRepository implements ApprovalInterface
     {
         return ApprovalDefinition::query()
             ->where('code', $code)
-            ->with('steps')
+            ->with(['steps' => fn ($q) => $q->orderBy('step_order')])
             ->first();
     }
 
@@ -22,18 +22,19 @@ class ApprovalRepository implements ApprovalInterface
         return ApprovalRequest::query()
             ->where('approvable_type', $approvable::class)
             ->where('approvable_id', (string) $approvable->getKey())
-            ->where('active_key', 1)
+            ->where('status', 'pending')
+            ->where('is_current', true)
             ->first();
     }
 
     public function createRequest(array $data): ApprovalRequest
     {
-        return ApprovalRequest::create($data);
+        return ApprovalRequest::query()->create($data);
     }
 
     public function createStepsBulk(array $rows): void
     {
-        ApprovalStep::insert($rows);
+        ApprovalStep::query()->insert($rows);
     }
 
     public function lockRequest(string $id): ?ApprovalRequest

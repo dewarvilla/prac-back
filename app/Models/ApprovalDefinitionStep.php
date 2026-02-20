@@ -5,15 +5,14 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Support\Str;
+use App\Models\Concerns\Auditable;
 
 class ApprovalDefinitionStep extends Model
 {
     use HasFactory;
+    use Auditable;
 
     protected $table = 'approval_definition_steps';
-
-    const CREATED_AT = 'fechacreacion';
-    const UPDATED_AT = 'fechamodificacion';
 
     protected $keyType = 'string';
     public $incrementing = false;
@@ -21,16 +20,14 @@ class ApprovalDefinitionStep extends Model
     protected $fillable = [
         'approval_definition_id','step_order','role_key',
         'requires_comment_on_reject','sla_days',
-        'usuariocreacion','usuariomodificacion',
-        'ipcreacion','ipmodificacion',
     ];
 
     protected $casts = [
         'step_order'                 => 'integer',
         'requires_comment_on_reject' => 'boolean',
         'sla_days'                   => 'integer',
-        'fechacreacion'              => 'datetime',
-        'fechamodificacion'          => 'datetime',
+        'created_at'                 => 'datetime',
+        'updated_at'                 => 'datetime',
     ];
 
     protected static function booted(): void

@@ -27,14 +27,10 @@ class UpdateSalarioRequest extends FormRequest
             'valor' => ['numeric','min:0'],
 
             // prohibidos desde cliente
-            'id'                => ['prohibited'],
-            'estado'            => ['prohibited'],
-            'fechacreacion'     => ['prohibited'],
-            'fechamodificacion' => ['prohibited'],
-            'usuariocreacion'   => ['prohibited'],
-            'usuariomodificacion'=> ['prohibited'],
-            'ipcreacion'        => ['prohibited'],
-            'ipmodificacion'    => ['prohibited'],
+            'id'         => ['prohibited'],
+            'estado'     => ['prohibited'],
+            'created_at' => ['prohibited'],
+            'updated_at' => ['prohibited'],
         ];
 
         if ($this->isMethod('put')) {

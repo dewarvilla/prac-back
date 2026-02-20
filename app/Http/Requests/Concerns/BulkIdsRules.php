@@ -4,14 +4,14 @@ namespace App\Http\Requests\Concerns;
 
 trait BulkIdsRules
 {
-    protected function bulkIdsRules(string $table, string $type = 'uuid'): array
+    protected function bulkIdsRules(string $table, string $type = 'uuid', int $max = 1000): array
     {
         $idRules = $type === 'int'
             ? ['integer','distinct','min:1',"exists:{$table},id"]
             : ['string','uuid','distinct',"exists:{$table},id"];
 
         return [
-            'ids'   => ['required','array','min:1','max:1000'],
+            'ids'   => ['required','array','min:1',"max:{$max}"],
             'ids.*' => $idRules,
         ];
     }

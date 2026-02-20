@@ -4,7 +4,7 @@ namespace App\Exceptions\Approvals;
 
 use App\Exceptions\ConflictException;
 
-class ApprovalWrongStepException extends ConflictException
+final class ApprovalWrongStepException extends ConflictException
 {
     public function __construct(int $expected, int $given)
     {

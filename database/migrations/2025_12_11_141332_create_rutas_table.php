@@ -38,19 +38,13 @@ return new class extends Migration {
 
             $table->text('justificacion')->nullable();
 
-            // Auditoría
-            $table->boolean('estado')->default(true);
-            $table->timestamp('fechacreacion')->useCurrent();
-            $table->timestamp('fechamodificacion')->useCurrent()->useCurrentOnUpdate();
-            $table->unsignedBigInteger('usuariocreacion')->nullable();
-            $table->unsignedBigInteger('usuariomodificacion')->nullable();
-            $table->ipAddress('ipcreacion')->nullable();
-            $table->ipAddress('ipmodificacion')->nullable();
-
             $table->index(['programacion_id', 'orden']);
             $table->index('categoria_peaje');
             $table->index('origen_place_id');
             $table->index('destino_place_id');
+
+            $table->boolean('estado')->default(true);
+            $table->timestamps();
         });
     }
 

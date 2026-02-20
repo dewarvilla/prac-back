@@ -32,14 +32,8 @@ return new class extends Migration
             $table->index('numero_identificacion');
             $table->index('tipo_participante');
 
-            // Auditoría
-            $table->boolean('estado')->default(true)->comment('');
-            $table->timestamp('fechacreacion')->useCurrent();
-            $table->timestamp('fechamodificacion')->useCurrent()->useCurrentOnUpdate();
-            $table->unsignedBigInteger('usuariocreacion')->nullable();
-            $table->unsignedBigInteger('usuariomodificacion')->nullable();
-            $table->ipAddress('ipcreacion')->nullable();
-            $table->ipAddress('ipmodificacion')->nullable();
+            $table->boolean('estado')->default(true);
+            $table->timestamps();
         });
     }
 

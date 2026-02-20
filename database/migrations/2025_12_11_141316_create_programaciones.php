@@ -30,7 +30,6 @@ return new class extends Migration
 
             // Estado macro para el proceso de programación
             $table->enum('estado_practica', [
-                'borrador',
                 'en_aprobacion',
                 'aprobada',
                 'rechazada',
@@ -38,7 +37,7 @@ return new class extends Migration
                 'ejecutada',
                 'en_legalizacion',
                 'legalizada',
-            ])->default('borrador');
+            ])->default('en_aprobacion');
 
             $table->date('fecha_inicio');
             $table->date('fecha_finalizacion');
@@ -54,13 +53,8 @@ return new class extends Migration
                 'programaciones_nombre_fechas_unique'
             );
 
-            // Auditoría
-            $table->timestamp('fechacreacion')->useCurrent();
-            $table->timestamp('fechamodificacion')->useCurrent()->useCurrentOnUpdate();
-            $table->unsignedBigInteger('usuariocreacion')->nullable();
-            $table->unsignedBigInteger('usuariomodificacion')->nullable();
-            $table->ipAddress('ipcreacion')->nullable();
-            $table->ipAddress('ipmodificacion')->nullable();
+            $table->boolean('estado')->default(true);
+            $table->timestamps();
         });
     }
 

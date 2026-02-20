@@ -4,18 +4,16 @@ namespace App\Http\Requests\V1\Catalogo;
 
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
-use App\Http\Requests\Concerns\NormalizesCommon;
+use App\Http\Requests\Concerns\TrimsStrings;
 
 class BulkCatalogoRequest extends FormRequest
 {
-    use NormalizesCommon;
+    use TrimsStrings;
 
     public function authorize(): bool { return true; }
 
     protected function prepareForValidation(): void
     {
-        if (!$this->has('items')) return;
-
         $items = $this->input('items', []);
         if (!is_array($items)) $items = [];
 
@@ -23,10 +21,10 @@ class BulkCatalogoRequest extends FormRequest
             if (!is_array($i)) return $i;
 
             return [
-            'nivel_academico'    => $this->normLower($i['nivel_academico'] ?? $i['nivelAcademico'] ?? null),
-            'facultad'           => $this->normText($i['facultad'] ?? null),
-            'programa_academico' => $this->normText($i['programa_academico'] ?? $i['programaAcademico'] ?? null),
-        ];
+                'nivel_academico'    => $this->normText($i['nivel_academico'] ?? $i['nivelAcademico'] ?? null),
+                'facultad'           => $this->normText($i['facultad'] ?? null),
+                'programa_academico' => $this->normText($i['programa_academico'] ?? $i['programaAcademico'] ?? null),
+            ];
         })->all();
 
         $this->merge(['items' => $items]);
@@ -35,11 +33,11 @@ class BulkCatalogoRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'items'                      => ['required','array','min:1','max:1000'],
-            'items.*'                    => ['required','array'],
-            'items.*.nivel_academico'    => ['required', Rule::in(['pregrado','postgrado'])],
-            'items.*.facultad'           => ['required','string','max:255'],
-            'items.*.programa_academico' => ['required','string','max:255'],
+            'items'                      => ['required', 'array', 'min:1', 'max:1000'],
+            'items.*'                    => ['required', 'array'],
+            'items.*.nivel_academico'    => ['required', Rule::in(['pregrado', 'postgrado'])],
+            'items.*.facultad'           => ['required', 'string', 'max:255'],
+            'items.*.programa_academico' => ['required', 'string', 'max:255'],
         ];
     }
 
@@ -49,25 +47,18 @@ class BulkCatalogoRequest extends FormRequest
             $items = $this->input('items', []);
             if (!is_array($items) || empty($items)) return;
 
-            $keys = [];
-            $dupes = [];
-
+            $seen = [];
             foreach ($items as $idx => $it) {
-                $k = $this->normKey($it['facultad'] ?? null, $it['programa_academico'] ?? null);
+                if (!is_array($it)) continue;
+
+                $k = mb_strtolower(trim((string)($it['facultad'] ?? ''))).'|'.mb_strtolower(trim((string)($it['programa_academico'] ?? '')));
                 if ($k === '|') continue;
 
-                if (isset($keys[$k])) {
-                    $dupes[] = [$keys[$k], $idx];
-                } else {
-                    $keys[$k] = $idx;
+                if (isset($seen[$k])) {
+                    $v->errors()->add('items', 'Hay combinaciones repetidas (facultad, programa_academico) dentro del payload.');
+                    return;
                 }
-            }
-
-            if (!empty($dupes)) {
-                $v->errors()->add(
-                    'items',
-                    'Hay combinaciones repetidas (facultad, programa_academico) dentro del payload.'
-                );
+                $seen[$k] = $idx;
             }
         });
     }

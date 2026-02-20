@@ -8,9 +8,18 @@ class CreacionResource extends JsonResource
 {
     public function toArray($request): array
     {
-        return [
-            'id' => (string) $this->id,
+        $labels = [
+            'comite_acreditacion' => 'Comité de Acreditación',
+            'consejo_facultad'    => 'Consejo de Facultad',
+            'consejo_academico'   => 'Consejo Académico',
+        ];
 
+        $ar = $this->relationLoaded('currentApprovalRequest')
+            ? $this->currentApprovalRequest
+            : null;
+
+        return [
+            'id'         => (string) $this->id,
             'catalogoId' => (string) $this->catalogo_id,
 
             'nombrePractica'     => $this->nombre_practica,
@@ -18,16 +27,27 @@ class CreacionResource extends JsonResource
             'justificacion'      => $this->justificacion,
 
             'estadoCreacion' => $this->estado_creacion,
-            'estadoFlujo'    => $this->estado_flujo,
-        
-            'programaAcademico' => $this->whenLoaded('catalogo', fn () => $this->catalogo?->programa_academico),
+            'estado'         => (bool) $this->estado,
 
-            'fechacreacion'       => $this->fechacreacion,
-            'fechamodificacion'   => $this->fechamodificacion,
-            'usuariocreacion'     => $this->usuariocreacion,
-            'usuariomodificacion' => $this->usuariomodificacion,
-            'ipcreacion'          => $this->ipcreacion,
-            'ipmodificacion'      => $this->ipmodificacion,
+            'estadoFlujo' => $ar ? ($labels[$ar->current_role_key] ?? $ar->current_role_key) : null,
+
+            'approval' => $ar ? [
+                'id'               => (string) $ar->id,
+                'status'           => $ar->status,
+                'currentRoleKey'   => $ar->current_role_key,
+                'currentRoleLabel' => $labels[$ar->current_role_key] ?? $ar->current_role_key,
+            ] : null,
+
+            'isEditable'  => $this->estado_creacion === 'rechazada',
+            'isDeletable' => $this->estado_creacion === 'rechazada',
+
+            'programaAcademico' => $this->whenLoaded(
+                'catalogo',
+                fn () => $this->catalogo?->programa_academico
+            ),
+
+            'createdAt' => $this->created_at?->toISOString(),
+            'updatedAt' => $this->updated_at?->toISOString(),
         ];
     }
 }

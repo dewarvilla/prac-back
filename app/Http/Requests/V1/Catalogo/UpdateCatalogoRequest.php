@@ -4,11 +4,12 @@ namespace App\Http\Requests\V1\Catalogo;
 
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
-use App\Http\Requests\Concerns\NormalizesCommon;
+use App\Http\Requests\Concerns\TrimsStrings;
+use App\Http\Requests\Concerns\AppliesPatchRules;
 
 class UpdateCatalogoRequest extends FormRequest
 {
-    use NormalizesCommon;
+    use TrimsStrings, AppliesPatchRules;
 
     public function authorize(): bool { return true; }
 
@@ -23,7 +24,7 @@ class UpdateCatalogoRequest extends FormRequest
             $merged['programa_academico'] = $this->normText($this->input('programa_academico'));
         }
         if ($this->has('nivel_academico')) {
-            $merged['nivel_academico'] = $this->normLower($this->input('nivel_academico'));
+            $merged['nivel_academico'] = $this->normText($this->input('nivel_academico'));
         }
 
         if ($merged) $this->merge($merged);
@@ -31,34 +32,43 @@ class UpdateCatalogoRequest extends FormRequest
 
     public function rules(): array
     {
-        $id = $this->route('catalogo')?->id;
+        $catalogo = $this->route('catalogo');
+        $id = $catalogo?->id;
 
-        if ($this->isMethod('patch')) {
-            return [
-                'nivel_academico'    => ['sometimes', Rule::in(['pregrado','postgrado'])],
-                'facultad'           => ['sometimes','string','max:255'],
-                'programa_academico' => [
-                    'sometimes','string','max:255',
-                    Rule::unique('catalogos','programa_academico')
-                        ->where(fn($q) => $q->where(
-                            'facultad',
-                            $this->input('facultad', $this->route('catalogo')?->facultad)
-                        ))
-                        ->ignore($id),
-                ],
-            ];
+        $base = [
+            'nivel_academico'    => ['bail', Rule::in(['pregrado','postgrado'])],
+            'facultad'           => ['bail','string','max:255'],
+            'programa_academico' => ['bail','string','max:255'],
+
+            // prohibidos desde cliente
+            'id'         => ['prohibited'],
+            'estado'     => ['prohibited'],
+            'created_at' => ['prohibited'],
+            'updated_at' => ['prohibited'],
+        ];
+
+        $touchesUnique =
+            $this->filled('facultad') ||
+            $this->filled('programa_academico') ||
+            $this->isMethod('put');
+
+        if ($touchesUnique) {
+            $facultad = $this->input('facultad', $catalogo?->facultad);
+
+            $base['programa_academico'][] = Rule::unique('catalogos','programa_academico')
+                ->where(fn($q) => $q->where('facultad', $facultad))
+                ->ignore($id);
         }
 
-        return [
-            'nivel_academico'    => ['required', Rule::in(['pregrado','postgrado'])],
-            'facultad'           => ['required','string','max:255'],
-            'programa_academico' => [
-                'required','string','max:255',
-                Rule::unique('catalogos','programa_academico')
-                    ->where(fn($q) => $q->where('facultad', $this->input('facultad')))
-                    ->ignore($id),
-            ],
-        ];
+        if ($this->isMethod('patch')) {
+            return $this->patchify($base);
+        }
+
+        return array_merge($base, [
+            'nivel_academico'    => ['bail','required', Rule::in(['pregrado','postgrado'])],
+            'facultad'           => ['bail','required','string','max:255'],
+            'programa_academico' => ['bail','required','string','max:255'],
+        ]);
     }
 
     public function messages(): array

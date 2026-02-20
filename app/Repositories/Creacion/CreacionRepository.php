@@ -12,7 +12,11 @@ class CreacionRepository implements CreacionInterface
 {
     public function query(): Builder
     {
-        return Creacion::query()->with('catalogo');
+        return Creacion::query()->with([
+            'catalogo',
+            'currentApprovalRequest.definition',
+            'currentApprovalRequest.steps',
+        ]);
     }
 
     public function find(string $id): ?Creacion
@@ -27,16 +31,16 @@ class CreacionRepository implements CreacionInterface
 
     public function update(string $id, array $data): ?Creacion
     {
-        $c = $this->find($id);
+        $c = Creacion::query()->find($id);
         if (!$c) return null;
 
         $c->update($data);
-        return $c->refresh();
+        return $this->find($id);
     }
 
     public function delete(string $id): bool
     {
-        $c = $this->find($id);
+        $c = Creacion::query()->find($id);
         if (!$c) return false;
 
         $c->delete();
@@ -61,7 +65,8 @@ class CreacionRepository implements CreacionInterface
 
     public function existsNombreInCatalogo(string $catalogoId, string $nombre, ?string $ignoreId = null): bool
     {
-        $q = Creacion::where('catalogo_id', $catalogoId)
+        $q = Creacion::query()
+            ->where('catalogo_id', $catalogoId)
             ->where('nombre_practica', $nombre);
 
         if ($ignoreId) $q->where('id', '!=', $ignoreId);
@@ -79,6 +84,11 @@ class CreacionRepository implements CreacionInterface
             $q->where('estado_creacion', $filters['estado_creacion']);
         }
 
+        if (array_key_exists('estado', $filters) && $filters['estado'] !== null && $filters['estado'] !== '') {
+            $estado = filter_var($filters['estado'], FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
+            if ($estado !== null) $q->where('estado', $estado);
+        }
+
         if (!empty($filters['nombre_practica'])) {
             $q->where('nombre_practica', $filters['nombre_practica']);
         }
@@ -93,11 +103,12 @@ class CreacionRepository implements CreacionInterface
                 $qq->where('nombre_practica', $op, $like)
                     ->orWhereHas('catalogo', function ($qc) use ($like, $op) {
                         $qc->where('programa_academico', $op, $like)
-                            ->orWhere('facultad', $op, $like);
+                           ->orWhere('facultad', $op, $like);
                     });
             });
         }
 
+        // ---- SORT ----
         $sort  = $filters['sort'] ?? '-id';
         $dir   = str_starts_with((string) $sort, '-') ? 'desc' : 'asc';
         $field = ltrim((string) $sort, '-');
@@ -107,8 +118,9 @@ class CreacionRepository implements CreacionInterface
             'catalogo_id',
             'nombre_practica',
             'estado_creacion',
-            'fechacreacion',
-            'fechamodificacion',
+            'estado',
+            'created_at',
+            'updated_at',
         ];
 
         if (in_array($field, $sortable, true)) {

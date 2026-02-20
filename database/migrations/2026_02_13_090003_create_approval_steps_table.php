@@ -15,31 +15,26 @@ return new class extends Migration {
                 ->cascadeOnUpdate()
                 ->cascadeOnDelete();
 
-            // Orden del paso dentro de la solicitud (1..n)
             $table->unsignedInteger('step_order');
-
-            // Rol responsable del paso
             $table->string('role_key', 80);
 
             $table->enum('status', ['pending', 'approved', 'rejected', 'skipped'])
-                  ->default('pending');
+                ->default('pending');
 
-            // Decisión
             $table->unsignedBigInteger('acted_by')->nullable();
             $table->timestamp('acted_at')->nullable();
             $table->text('comment')->nullable();
+
+            $table->foreign('acted_by')
+                ->references('id')->on('users')
+                ->nullOnDelete()
+                ->cascadeOnUpdate();
 
             $table->unique(['approval_request_id', 'step_order'], 'approval_step_unique');
             $table->index(['approval_request_id', 'status']);
             $table->index(['role_key', 'status']);
 
-            // Auditoría 
-            $table->timestamp('fechacreacion')->useCurrent();
-            $table->timestamp('fechamodificacion')->useCurrent()->useCurrentOnUpdate();
-            $table->unsignedBigInteger('usuariocreacion')->nullable();
-            $table->unsignedBigInteger('usuariomodificacion')->nullable();
-            $table->ipAddress('ipcreacion')->nullable();
-            $table->ipAddress('ipmodificacion')->nullable();
+            $table->timestamps();
         });
     }
 

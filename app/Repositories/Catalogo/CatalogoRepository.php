@@ -17,7 +17,7 @@ class CatalogoRepository implements CatalogoInterface
 
     public function find(string $id): ?Catalogo
     {
-        return Catalogo::find($id);
+        return $this->query()->find($id);
     }
 
     public function create(array $data): Catalogo
@@ -27,16 +27,16 @@ class CatalogoRepository implements CatalogoInterface
 
     public function update(string $id, array $data): ?Catalogo
     {
-        $c = $this->find($id);
+        $c = Catalogo::query()->find($id);
         if (!$c) return null;
 
         $c->update($data);
-        return $c->refresh();
+        return $this->find($id);
     }
 
     public function delete(string $id): bool
     {
-        $c = $this->find($id);
+        $c = Catalogo::query()->find($id);
         if (!$c) return false;
 
         $c->delete();
@@ -61,32 +61,35 @@ class CatalogoRepository implements CatalogoInterface
 
     public function existsPair(string $facultad, string $programaAcademico, ?string $ignoreId = null): bool
     {
-        $q = Catalogo::query()
-            ->where('facultad', $facultad)
-            ->where('programa_academico', $programaAcademico);
+        $fac = mb_strtolower(trim($facultad));
+        $pro = mb_strtolower(trim($programaAcademico));
 
-        if ($ignoreId) $q->where('id', '!=', $ignoreId);
+        $q = Catalogo::query()
+            ->whereRaw('LOWER(facultad) = ?', [$fac])
+            ->whereRaw('LOWER(programa_academico) = ?', [$pro]);
+
+        if ($ignoreId) {
+            $q->where('id', '!=', $ignoreId);
+        }
 
         return $q->exists();
     }
 
     public function upsertBulk(array $rows): void
     {
-        $rows = array_map(function ($r) {
+        $now = now();
+
+        $rows = array_map(function ($r) use ($now) {
             unset($r['__key']);
+            $r['updated_at'] = $r['updated_at'] ?? $now;
+            $r['created_at'] = $r['created_at'] ?? $now;
             return $r;
         }, $rows);
 
         Catalogo::upsert(
             $rows,
             ['programa_academico', 'facultad'],
-            [
-                'nivel_academico',
-                'estado',
-                'fechamodificacion',
-                'usuariomodificacion',
-                'ipmodificacion',
-            ]
+            ['nivel_academico', 'estado', 'updated_at']
         );
     }
 
@@ -106,7 +109,23 @@ class CatalogoRepository implements CatalogoInterface
 
     private function applyFilters(Builder $q, array $filters): Builder
     {
-        // q libre
+        if (!empty($filters['nivel_academico'])) {
+            $q->where('nivel_academico', $filters['nivel_academico']);
+        }
+
+        if (!empty($filters['facultad'])) {
+            $q->where('facultad', 'like', '%'.$filters['facultad'].'%');
+        }
+
+        if (!empty($filters['programa_academico'])) {
+            $q->where('programa_academico', 'like', '%'.$filters['programa_academico'].'%');
+        }
+
+        if (array_key_exists('estado', $filters) && $filters['estado'] !== null && $filters['estado'] !== '') {
+            $estado = filter_var($filters['estado'], FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
+            if ($estado !== null) $q->where('estado', $estado);
+        }
+
         if (!empty($filters['q'])) {
             $term = (string) $filters['q'];
             $driver = DB::connection()->getDriverName();
@@ -120,43 +139,25 @@ class CatalogoRepository implements CatalogoInterface
             });
         }
 
-        if (!empty($filters['nivel_academico'])) {
-            $q->where('nivel_academico', $filters['nivel_academico']);
-        }
+        // ---- SORT----
+        $sort  = $filters['sort'] ?? 'facultad';
+        $dir   = str_starts_with((string) $sort, '-') ? 'desc' : 'asc';
+        $field = ltrim((string) $sort, '-');
 
-        if (!empty($filters['facultad'])) {
-            $q->where('facultad', 'like', '%'.$filters['facultad'].'%');
-        }
+        $sortable = [
+            'id',
+            'nivel_academico',
+            'facultad',
+            'programa_academico',
+            'estado',
+            'created_at',
+            'updated_at',
+        ];
 
-        if (!empty($filters['programa_academico'])) {
-            $q->where('programa_academico', 'like', '%'.$filters['programa_academico'].'%');
-        }
-
-        // lk (si tú lo estás usando como “like” explícito)
-        if (!empty($filters['facultad.lk'])) {
-            $q->where('facultad', 'like', '%'.$filters['facultad.lk'].'%');
-        }
-        if (!empty($filters['programa_academico.lk'])) {
-            $q->where('programa_academico', 'like', '%'.$filters['programa_academico.lk'].'%');
-        }
-        if (!empty($filters['nivel_academico.lk'])) {
-            $q->where('nivel_academico', 'like', '%'.$filters['nivel_academico.lk'].'%');
-        }
-
-        // sort normalizado
-        $sort = $filters['sort'] ?? 'facultad,programa_academico';
-        foreach (explode(',', (string)$sort) as $part) {
-            $part = trim($part);
-            if ($part === '') continue;
-
-            $dir = str_starts_with($part, '-') ? 'desc' : 'asc';
-            $col = ltrim($part, '-');
-
-            // whitelist simple para evitar orderBy de columnas raras
-            $allowed = ['id','facultad','programa_academico','nivel_academico','estado'];
-            if (!in_array($col, $allowed, true)) continue;
-
-            $q->orderBy($col, $dir);
+        if (in_array($field, $sortable, true)) {
+            $q->orderBy($field, $dir);
+        } else {
+            $q->orderBy('facultad', 'asc');
         }
 
         return $q;

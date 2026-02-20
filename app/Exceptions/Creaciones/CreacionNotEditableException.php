@@ -9,7 +9,7 @@ class CreacionNotEditableException extends UnprocessableEntityException
     public function __construct(string $estadoCreacion)
     {
         parent::__construct(
-            'La creación no se puede modificar en el estado actual.',
+            'La creación de la práctica no se puede modificar en el estado actual.',
             'CREACION_NOT_EDITABLE',
             ['estado_creacion' => $estadoCreacion]
         );

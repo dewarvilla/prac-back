@@ -4,7 +4,7 @@ namespace App\Exceptions\Approvals;
 
 use App\Exceptions\ConflictException;
 
-class ApprovalAlreadyFinalizedException extends ConflictException
+final class ApprovalAlreadyFinalizedException extends ConflictException
 {
     public function __construct(string $status)
     {

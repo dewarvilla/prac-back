@@ -4,7 +4,7 @@ namespace App\Exceptions\Approvals;
 
 use App\Exceptions\ConflictException;
 
-class ApprovalStepNotPendingException extends ConflictException
+final class ApprovalStepNotPendingException extends ConflictException
 {
     public function __construct(string $status)
     {

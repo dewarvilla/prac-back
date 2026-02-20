@@ -2,8 +2,21 @@
 
 namespace App\Services;
 
-use App\Exceptions\ApprovalException;
+use App\Exceptions\Approvals\ApprovalAlreadyActiveException;
+use App\Exceptions\Approvals\ApprovalAlreadyFinalizedException;
+use App\Exceptions\Approvals\ApprovalCancelNotAllowedException;
+use App\Exceptions\Approvals\ApprovalCurrentStepMissingException;
+use App\Exceptions\Approvals\ApprovalDefinitionInactiveException;
+use App\Exceptions\Approvals\ApprovalDefinitionNoStepsException;
+use App\Exceptions\Approvals\ApprovalDefinitionNotFoundException;
+use App\Exceptions\Approvals\ApprovalNotActionableException;
+use App\Exceptions\Approvals\ApprovalRequestIdNotFoundException;
+use App\Exceptions\Approvals\ApprovalStepNotPendingException;
+use App\Exceptions\Approvals\ApproverNotAllowedException;
+use App\Exceptions\Approvals\MissingRejectionCommentException;
+
 use App\Models\ApprovalRequest;
+use App\Models\ApprovalStep;
 use App\Models\User;
 use App\Repositories\Approval\ApprovalInterface;
 use Illuminate\Database\Eloquent\Model;
@@ -16,95 +29,71 @@ class ApprovalService
 
     public function start(Model $approvable, string $definitionCode, ?User $user, string $ip): ApprovalRequest
     {
-        return DB::transaction(function () use ($approvable, $definitionCode, $user, $ip) {
+        return DB::transaction(function () use ($approvable, $definitionCode, $user) {
 
             $def = $this->repo->findDefinitionByCode($definitionCode);
 
             if (!$def) {
-                throw new ApprovalException(
-                    message: 'Definición de aprobación no encontrada.',
-                    statusCode: 404,
-                    errorCode: 'APPROVAL_DEFINITION_NOT_FOUND',
-                    details: ['code' => $definitionCode]
-                );
+                throw new ApprovalDefinitionNotFoundException($definitionCode);
             }
 
             if (!$def->is_active) {
-                throw new ApprovalException(
-                    message: 'El flujo de aprobación está inactivo.',
-                    statusCode: 409,
-                    errorCode: 'APPROVAL_DEFINITION_INACTIVE',
-                    details: ['code' => $definitionCode]
-                );
+                throw new ApprovalDefinitionInactiveException($definitionCode);
             }
 
-            if ($def->steps->count() === 0) {
-                throw new ApprovalException(
-                    message: 'El flujo de aprobación no tiene pasos configurados.',
-                    statusCode: 409,
-                    errorCode: 'APPROVAL_DEFINITION_NO_STEPS',
-                    details: ['code' => $definitionCode]
-                );
+            if ($def->steps->isEmpty()) {
+                throw new ApprovalDefinitionNoStepsException($definitionCode);
             }
 
             $active = $this->repo->findActiveRequestFor($approvable);
             if ($active) {
-                throw new ApprovalException(
-                    message: 'Ya existe una solicitud de aprobación activa para este recurso.',
-                    statusCode: 409,
-                    errorCode: 'APPROVAL_ALREADY_ACTIVE',
-                    details: [
-                        'approval_request_id' => $active->id,
-                        'approvable_type'     => $approvable::class,
-                        'approvable_id'       => (string) $approvable->getKey(),
-                    ]
+                throw new ApprovalAlreadyActiveException(
+                    $approvable::class,
+                    (string) $approvable->getKey(),
+                    (string) $active->id
                 );
             }
 
-            $uid = $user?->id ?? 0;
-            $now = now();
+            $firstStep  = $def->steps->sortBy('step_order')->first();
+            $firstOrder = (int) $firstStep->step_order;
 
             $req = $this->repo->createRequest([
                 'approvable_type'        => $approvable::class,
                 'approvable_id'          => (string) $approvable->getKey(),
-                'approval_definition_id' => $def->id,
-                'status'                 => 'pending',
-                'current_step_order'     => 1,
+                'approval_definition_id' => (string) $def->id,
 
-                'active_key'             => 1,
+                'status'             => 'pending',
+                'current_step_order' => $firstOrder,
 
-                'fechacreacion'          => $now,
-                'fechamodificacion'      => $now,
-                'usuariocreacion'        => $uid,
-                'usuariomodificacion'    => $uid,
-                'ipcreacion'             => $ip,
-                'ipmodificacion'         => $ip,
+                // Auditoría central
+                'is_current'   => true,
+                'requested_by' => $user?->id,
+                'closed_at'    => null,
+
             ]);
 
             $rows = [];
-            foreach ($def->steps as $s) {
+            foreach ($def->steps->sortBy('step_order') as $s) {
                 $rows[] = [
                     'id'                  => (string) Str::uuid(),
-                    'approval_request_id' => $req->id,
+                    'approval_request_id' => (string) $req->id,
                     'step_order'          => (int) $s->step_order,
-                    'role_key'            => $s->role_key,
+                    'role_key'            => (string) $s->role_key,
                     'status'              => 'pending',
                     'acted_by'            => null,
                     'acted_at'            => null,
                     'comment'             => null,
-
-                    'fechacreacion'       => $now,
-                    'fechamodificacion'   => $now,
-                    'usuariocreacion'     => $uid,
-                    'usuariomodificacion' => $uid,
-                    'ipcreacion'          => $ip,
-                    'ipmodificacion'      => $ip,
                 ];
             }
 
             $this->repo->createStepsBulk($rows);
 
-            return $req->fresh()->load(['definition','steps']);
+            DB::afterCommit(function () use ($req) {
+                app(\App\Services\ApprovalNotificationService::class)
+                    ->notifyCurrentApprovers((string) $req->id);
+            });
+
+            return $req->fresh()->load(['definition', 'steps']);
         });
     }
 
@@ -114,65 +103,70 @@ class ApprovalService
 
             $req = $this->repo->lockRequest($approvalRequestId);
             if (!$req) {
-                throw new ApprovalException('Solicitud no encontrada.', 404, 'APPROVAL_REQUEST_NOT_FOUND');
+                throw new ApprovalRequestIdNotFoundException($approvalRequestId);
             }
 
-            if ((int)$req->active_key !== 1 || $req->status !== 'pending') {
-                throw new ApprovalException(
-                    'La solicitud no está pendiente o no está activa.',
-                    409,
-                    'APPROVAL_NOT_ACTIONABLE',
-                    ['status' => $req->status, 'active_key' => $req->active_key]
-                );
-            }
+            $this->assertActionable($req);
 
-            $req->load(['steps','definition.steps']);
+            $req->load(['steps', 'definition.steps']);
 
-            $current = $req->steps->firstWhere('step_order', (int)$req->current_step_order);
+            $current = $req->steps->firstWhere('step_order', (int) $req->current_step_order);
             if (!$current) {
-                throw new ApprovalException('Paso actual no encontrado.', 409, 'APPROVAL_CURRENT_STEP_MISSING');
+                throw new ApprovalCurrentStepMissingException((string) $req->id, (int) $req->current_step_order);
             }
 
-            $this->assertCanAct($user, $req, 'aprobar', $current->role_key);
+            $this->assertCanAct($user, $req, 'aprobar', (string) $current->role_key);
 
             if ($current->status !== 'pending') {
-                throw new ApprovalException('El paso actual ya fue gestionado.', 409, 'APPROVAL_STEP_NOT_PENDING');
+                throw new ApprovalStepNotPendingException((string) $current->status);
             }
 
             $now = now();
 
             $current->update([
-                'status'              => 'approved',
-                'acted_by'            => $user->id,
-                'acted_at'            => $now,
-                'comment'             => $comment,
-
-                'fechamodificacion'   => $now,
-                'usuariomodificacion' => $user->id,
-                'ipmodificacion'      => $ip,
+                'status'   => 'approved',
+                'acted_by' => $user->id,
+                'acted_at' => $now,
+                'comment'  => $comment,
             ]);
 
             $maxOrder = (int) $req->steps->max('step_order');
+            $isFinal  = ((int) $req->current_step_order >= $maxOrder);
 
-            if ((int)$req->current_step_order >= $maxOrder) {
+            if ($isFinal) {
                 $req->update([
-                    'status'              => 'approved',
-                    'active_key'          => null,
-
-                    'fechamodificacion'   => $now,
-                    'usuariomodificacion' => $user->id,
-                    'ipmodificacion'      => $ip,
+                    'status'     => 'approved',
+                    'is_current' => false,
+                    'closed_at'  => $now,
                 ]);
+
+                $this->applyFinalStatusToApprovable($req, 'approved', $user, $ip);
+
             } else {
+                $nextOrder = (int) $req->current_step_order + 1;
+                $nextStep  = $req->steps->firstWhere('step_order', $nextOrder);
+
+                if (!$nextStep) {
+                    throw new ApprovalCurrentStepMissingException((string) $req->id, $nextOrder);
+                }
+
                 $req->update([
-                    'current_step_order'  => (int)$req->current_step_order + 1,
-                    'fechamodificacion'   => $now,
-                    'usuariomodificacion' => $user->id,
-                    'ipmodificacion'      => $ip,
+                    'current_step_order' => $nextOrder,
                 ]);
             }
 
-            return $req->fresh()->load(['definition','steps']);
+            DB::afterCommit(function () use ($req, $isFinal, $comment) {
+                $notifier = app(\App\Services\ApprovalNotificationService::class);
+
+                if ($isFinal) {
+                    $notifier->notifyCreatorStatus((string) $req->id, 'approved', $comment);
+                } else {
+                    $notifier->notifyCurrentApprovers((string) $req->id);
+                    $notifier->notifyCreatorStatus((string) $req->id, 'pending', $comment);
+                }
+            });
+
+            return $req->fresh()->load(['definition', 'steps']);
         });
     }
 
@@ -182,72 +176,65 @@ class ApprovalService
 
             $req = $this->repo->lockRequest($approvalRequestId);
             if (!$req) {
-                throw new ApprovalException('Solicitud no encontrada.', 404, 'APPROVAL_REQUEST_NOT_FOUND');
+                throw new ApprovalRequestIdNotFoundException($approvalRequestId);
             }
 
-            if ((int)$req->active_key !== 1 || $req->status !== 'pending') {
-                throw new ApprovalException('La solicitud no está pendiente o no está activa.', 409, 'APPROVAL_NOT_ACTIONABLE');
-            }
+            $this->assertActionable($req);
 
-            $req->load(['steps','definition.steps']);
+            $req->load(['steps', 'definition.steps']);
 
             $currentOrder = (int) $req->current_step_order;
-            $current = $req->steps->firstWhere('step_order', $currentOrder);
+            $current      = $req->steps->firstWhere('step_order', $currentOrder);
+
             if (!$current) {
-                throw new ApprovalException('Paso actual no encontrado.', 409, 'APPROVAL_CURRENT_STEP_MISSING');
+                throw new ApprovalCurrentStepMissingException((string) $req->id, $currentOrder);
             }
 
-            $this->assertCanAct($user, $req, 'rechazar', $current->role_key);
+            $this->assertCanAct($user, $req, 'rechazar', (string) $current->role_key);
 
             if ($current->status !== 'pending') {
-                throw new ApprovalException('El paso actual ya fue gestionado.', 409, 'APPROVAL_STEP_NOT_PENDING');
+                throw new ApprovalStepNotPendingException((string) $current->status);
             }
 
             $defStep  = $req->definition->steps->firstWhere('step_order', $currentOrder);
-            $requires = (bool)($defStep?->requires_comment_on_reject ?? true);
+            $requires = (bool) ($defStep?->requires_comment_on_reject ?? true);
 
-            if ($requires && trim((string)$comment) === '') {
-                throw new ApprovalException(
-                    'Debes enviar un comentario para rechazar en este paso.',
-                    422,
-                    'APPROVAL_COMMENT_REQUIRED',
-                    ['step_order' => $currentOrder, 'role_key' => $current->role_key]
-                );
+            if ($requires && trim((string) $comment) === '') {
+                throw new MissingRejectionCommentException($currentOrder, (string) $current->role_key);
             }
 
             $now = now();
 
             $current->update([
-                'status'              => 'rejected',
-                'acted_by'            => $user->id,
-                'acted_at'            => $now,
-                'comment'             => $comment,
-
-                'fechamodificacion'   => $now,
-                'usuariomodificacion' => $user->id,
-                'ipmodificacion'      => $ip,
+                'status'   => 'rejected',
+                'acted_by' => $user->id,
+                'acted_at' => $now,
+                'comment'  => $comment,
             ]);
 
-            foreach ($req->steps as $s) {
-                if ((int)$s->step_order > $currentOrder && $s->status === 'pending') {
-                    $s->update([
-                        'status'              => 'skipped',
-                        'fechamodificacion'   => $now,
-                        'usuariomodificacion' => $user->id,
-                        'ipmodificacion'      => $ip,
-                    ]);
-                }
-            }
+            ApprovalStep::query()
+                ->where('approval_request_id', (string) $req->id)
+                ->where('step_order', '>', $currentOrder)
+                ->where('status', 'pending')
+                ->update([
+                    'status'     => 'skipped',
+                    'updated_at' => $now,
+                ]);
 
             $req->update([
-                'status'              => 'rejected',
-                'active_key'          => null,
-                'fechamodificacion'   => $now,
-                'usuariomodificacion' => $user->id,
-                'ipmodificacion'      => $ip,
+                'status'     => 'rejected',
+                'is_current' => false,
+                'closed_at'  => $now,
             ]);
 
-            return $req->fresh()->load(['definition','steps']);
+            $this->applyFinalStatusToApprovable($req, 'rejected', $user, $ip);
+
+            DB::afterCommit(function () use ($req, $comment) {
+                app(\App\Services\ApprovalNotificationService::class)
+                    ->notifyCreatorStatus((string) $req->id, 'rejected', $comment);
+            });
+
+            return $req->fresh()->load(['definition', 'steps']);
         });
     }
 
@@ -256,49 +243,60 @@ class ApprovalService
         return DB::transaction(function () use ($approvalRequestId, $user, $ip) {
 
             $req = $this->repo->lockRequest($approvalRequestId);
-            if (!$req) throw new ApprovalException('Solicitud no encontrada.', 404, 'APPROVAL_REQUEST_NOT_FOUND');
-
-            if ((int)$req->active_key !== 1 || $req->status !== 'pending') {
-                throw new ApprovalException('La solicitud no está pendiente o no está activa.', 409, 'APPROVAL_NOT_ACTIONABLE');
+            if (!$req) {
+                throw new ApprovalRequestIdNotFoundException($approvalRequestId);
             }
 
-            $isAdmin = $user->hasRole('super_admin') || $user->hasRole('administrador') || $user->hasRole('admin');
-            if (!$isAdmin && (int)$req->usuariocreacion !== (int)$user->id) {
-                throw new ApprovalException('No tienes permisos para cancelar esta solicitud.', 403, 'APPROVAL_FORBIDDEN');
-            }
+            $this->assertActionable($req);
 
-            $req->load('steps');
+            $isAdmin   = $user->hasRole('super_admin') || $user->hasRole('administrador') || $user->hasRole('admin');
+            $creatorId = $req->requested_by ? (int) $req->requested_by : null;
+
+            if (!$isAdmin && $creatorId !== (int) $user->id) {
+                throw new ApprovalCancelNotAllowedException((string) $req->id, (int) $user->id, $creatorId);
+            }
 
             $now = now();
 
-            foreach ($req->steps as $s) {
-                if ($s->status === 'pending') {
-                    $s->update([
-                        'status'              => 'skipped',
-                        'fechamodificacion'   => $now,
-                        'usuariomodificacion' => $user->id,
-                        'ipmodificacion'      => $ip,
-                    ]);
-                }
-            }
+            ApprovalStep::query()
+                ->where('approval_request_id', (string) $req->id)
+                ->where('status', 'pending')
+                ->update([
+                    'status'     => 'skipped',
+                    'updated_at' => $now,
+                ]);
 
             $req->update([
-                'status'              => 'cancelled',
-                'active_key'          => null,
-                'fechamodificacion'   => $now,
-                'usuariomodificacion' => $user->id,
-                'ipmodificacion'      => $ip,
+                'status'     => 'cancelled',
+                'is_current' => false,
+                'closed_at'  => $now,
             ]);
 
-            return $req->fresh()->load(['definition','steps']);
+            $this->applyFinalStatusToApprovable($req, 'cancelled', $user, $ip);
+
+            DB::afterCommit(function () use ($req) {
+                app(\App\Services\ApprovalNotificationService::class)
+                    ->notifyCreatorStatus((string) $req->id, 'cancelled', null);
+            });
+
+            return $req->fresh()->load(['definition', 'steps']);
         });
+    }
+
+    private function assertActionable(ApprovalRequest $req): void
+    {
+        if ($req->status !== 'pending') {
+            throw new ApprovalAlreadyFinalizedException((string) $req->status);
+        }
+
+        if (!$req->is_current) {
+            throw new ApprovalNotActionableException((string) $req->id, (string) $req->status, 0);
+        }
     }
 
     private function assertCanAct(User $user, ApprovalRequest $req, string $action, string $roleKey): void
     {
-        $base = $this->permBaseFromApprovable($req->approvable_type);
-
-        $perm = "{$base}.{$action}.{$roleKey}"; // aprobar|rechazar
+        $perm = "approvals.{$action}.{$roleKey}";
 
         if (
             $user->hasRole('super_admin') ||
@@ -309,20 +307,29 @@ class ApprovalService
             return;
         }
 
-        throw new ApprovalException(
-            message: 'No tienes permisos para actuar en este paso.',
-            statusCode: 403,
-            errorCode: 'APPROVAL_FORBIDDEN',
-            details: ['required_permission' => $perm, 'role_key' => $roleKey]
-        );
+        throw new ApproverNotAllowedException($roleKey, $perm);
     }
 
-    private function permBaseFromApprovable(string $approvableType): string
+    private function applyFinalStatusToApprovable(ApprovalRequest $req, string $finalStatus, User $actor, string $ip): void
     {
-        return match ($approvableType) {
-            \App\Models\Creacion::class     => 'creaciones',
-            \App\Models\Programacion::class => 'programaciones',
-            default                        => 'approvals',
-        };
+        $now = now();
+
+        if ($req->approvable_type === \App\Models\Creacion::class) {
+            $estado = match ($finalStatus) {
+                'approved'  => 'aprobada',
+                'rejected'  => 'rechazada',
+                'cancelled' => 'creada',
+                default     => 'en_aprobacion',
+            };
+
+            \App\Models\Creacion::query()
+                ->where('id', (string) $req->approvable_id)
+                ->update([
+                    'estado_creacion' => $estado,
+                    'updated_at'      => $now,
+                ]);
+        }
+
+        //Programacions aquí.
     }
 }

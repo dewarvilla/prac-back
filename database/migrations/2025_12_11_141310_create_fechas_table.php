@@ -27,14 +27,8 @@ return new class extends Migration
         $table->date('fecha_cierre_coordinador_postg');
         $table->date('fecha_cierre_jefe_postg');
 
-        // Auditoría
         $table->boolean('estado')->default(true);
-        $table->timestamp('fechacreacion')->useCurrent();
-        $table->timestamp('fechamodificacion')->useCurrent()->useCurrentOnUpdate();
-        $table->unsignedBigInteger('usuariocreacion')->nullable();
-        $table->unsignedBigInteger('usuariomodificacion')->nullable();
-        $table->ipAddress('ipcreacion')->nullable();
-        $table->ipAddress('ipmodificacion')->nullable();
+        $table->timestamps();
         });
     }
 

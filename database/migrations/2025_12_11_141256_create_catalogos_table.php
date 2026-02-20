@@ -20,13 +20,8 @@ return new class extends Migration
             $table->index('facultad', 'catalogos_facultad_idx');
             $table->index('programa_academico', 'catalogos_programa_idx');
 
-            $table->boolean('estado')->default(true)->comment('');
-            $table->timestamp('fechacreacion')->useCurrent();
-            $table->timestamp('fechamodificacion')->useCurrent()->useCurrentOnUpdate();
-            $table->unsignedBigInteger('usuariocreacion')->nullable();
-            $table->unsignedBigInteger('usuariomodificacion')->nullable();
-            $table->ipAddress('ipcreacion')->nullable();
-            $table->ipAddress('ipmodificacion')->nullable();
+            $table->boolean('estado')->default(true);
+            $table->timestamps();
         });
     }
 

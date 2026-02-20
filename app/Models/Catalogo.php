@@ -5,15 +5,14 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Str;
+use App\Models\Concerns\Auditable;
 
 class Catalogo extends Model
 {
     use HasFactory;
+    use Auditable;
 
     protected $table = 'catalogos';
-
-    const CREATED_AT = 'fechacreacion';
-    const UPDATED_AT = 'fechamodificacion';
 
     protected $keyType = 'string';
     public $incrementing = false;
@@ -23,21 +22,17 @@ class Catalogo extends Model
         'nivel_academico',
         'facultad',
         'programa_academico',
-        'usuariocreacion',
-        'usuariomodificacion',
-        'ipcreacion',
-        'ipmodificacion',
     ];
 
     protected $casts = [
-        'estado'            => 'boolean',
-        'fechacreacion'     => 'datetime',
-        'fechamodificacion' => 'datetime',
+        'estado'     => 'boolean',
+        'created_at' => 'datetime',
+        'updated_at' => 'datetime',
     ];
 
     protected static function booted(): void
     {
-        static::creating(function (Catalogo $model) {
+        static::creating(function (self $model) {
             if (empty($model->id)) {
                 $model->id = (string) Str::uuid();
             }

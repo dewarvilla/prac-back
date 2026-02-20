@@ -5,15 +5,14 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Str;
+use App\Models\Concerns\Auditable;
 
 class Salario extends Model
 {
     use HasFactory;
+    use Auditable;
 
     protected $table = 'salarios';
-
-    const CREATED_AT = 'fechacreacion';
-    const UPDATED_AT = 'fechamodificacion';
 
     protected $keyType = 'string';
     public $incrementing = false;
@@ -22,18 +21,14 @@ class Salario extends Model
         'estado',
         'anio',
         'valor',
-        'usuariocreacion',
-        'usuariomodificacion',
-        'ipcreacion',
-        'ipmodificacion',
     ];
 
     protected $casts = [
-        'estado'            => 'boolean',
-        'anio'              => 'integer',
-        'valor'             => 'decimal:2',
-        'fechacreacion'     => 'datetime',
-        'fechamodificacion' => 'datetime',
+        'estado'     => 'boolean',
+        'anio'       => 'integer',
+        'valor'      => 'decimal:2',
+        'created_at' => 'datetime',
+        'updated_at' => 'datetime',
     ];
 
     protected static function booted(): void

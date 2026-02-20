@@ -9,20 +9,16 @@ class CatalogoResource extends JsonResource
     public function toArray($request): array
     {
         return [
-            'id'               => (string) $this->id,
+            'id' => (string) $this->id,
 
             'nivelAcademico'    => $this->nivel_academico,
             'facultad'          => $this->facultad,
             'programaAcademico' => $this->programa_academico,
 
-            'estado' => isset($this->estado) ? (bool) $this->estado : null,
+            'estado' => (bool) $this->estado,
 
-            'fechacreacion'       => $this->fechacreacion,
-            'fechamodificacion'   => $this->fechamodificacion,
-            'usuariocreacion'     => $this->usuariocreacion,
-            'usuariomodificacion' => $this->usuariomodificacion,
-            'ipcreacion'          => $this->ipcreacion,
-            'ipmodificacion'      => $this->ipmodificacion,
+            'createdAt' => $this->created_at?->toISOString(),
+            'updatedAt' => $this->updated_at?->toISOString(),
         ];
     }
 }

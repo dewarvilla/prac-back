@@ -39,15 +39,10 @@ return new class extends Migration {
             $table->string('fuente')->nullable();
             $table->date('fecha_tarifa')->nullable();
 
-            $table->boolean('estado')->default(true);
-            $table->timestamp('fechacreacion')->useCurrent();
-            $table->timestamp('fechamodificacion')->useCurrent()->useCurrentOnUpdate();
-            $table->unsignedBigInteger('usuariocreacion')->nullable();
-            $table->unsignedBigInteger('usuariomodificacion')->nullable();
-            $table->ipAddress('ipcreacion')->nullable();
-            $table->ipAddress('ipmodificacion')->nullable();
-
             $table->index(['ruta_id', 'orden_km']);
+
+            $table->boolean('estado')->default(true);
+            $table->timestamps();
         });
     }
 

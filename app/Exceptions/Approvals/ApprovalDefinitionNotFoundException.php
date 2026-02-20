@@ -4,7 +4,7 @@ namespace App\Exceptions\Approvals;
 
 use App\Exceptions\NotFoundException;
 
-class ApprovalDefinitionNotFoundException extends NotFoundException
+final class ApprovalDefinitionNotFoundException extends NotFoundException
 {
     public function __construct(string $code)
     {

@@ -5,29 +5,26 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Support\Str;
+use App\Models\Concerns\Auditable;
 
 class ApprovalDefinition extends Model
 {
     use HasFactory;
+    use Auditable;
 
     protected $table = 'approval_definitions';
-
-    const CREATED_AT = 'fechacreacion';
-    const UPDATED_AT = 'fechamodificacion';
 
     protected $keyType = 'string';
     public $incrementing = false;
 
     protected $fillable = [
         'code','name','is_active',
-        'usuariocreacion','usuariomodificacion',
-        'ipcreacion','ipmodificacion',
     ];
 
     protected $casts = [
-        'is_active'        => 'boolean',
-        'fechacreacion'    => 'datetime',
-        'fechamodificacion'=> 'datetime',
+        'is_active' => 'boolean',
+        'created_at'=> 'datetime',
+        'updated_at'=> 'datetime',
     ];
 
     protected static function booted(): void
